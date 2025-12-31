@@ -1,0 +1,494 @@
+import React, { useState, useMemo, useCallback } from "react";
+import { useAtom } from "jotai";
+import { remove } from "lodash";
+import { Modal } from "../shared/Modal.jsx";
+import { ModalHeader } from "../components/ModalHeader.js";
+import { SortableWrapper } from "../shared/SortableWrapper.jsx";
+import { SortableList, arrayMove } from "../shared/SortableList.jsx";
+import { horizontalListSortingStrategy } from "@dnd-kit/sortable";
+import { ModalFooter } from "../components/ModalFooter.js";
+import { Button } from "../components/Button.js";
+import { Select } from "../components/FormInputs.js";
+import { HelpIcon } from "../components/HelpIcon.js";
+import { MethodBlock } from "../components/MethodBlock.js";
+import {
+  userDataAtom,
+  selectedChannelAtom,
+  activeSetIdAtom,
+} from "../core/state.js";
+import { updateActiveSet, getMethodsByLayer } from "../core/utils.js";
+import { getActiveSetTracks } from "../../shared/utils/setUtils.js";
+import { getBaseMethodNames } from "../utils/moduleUtils.js";
+import { HELP_TEXT } from "../../shared/helpText.js";
+import { MethodCodeModal } from "./MethodCodeModal.jsx";
+
+const SortableItem = React.memo(
+  ({
+    id,
+    method,
+    handleRemoveMethod,
+    changeOption,
+    addMissingOption,
+    moduleMethods,
+    moduleName,
+    onShowMethodCode,
+  }) => {
+    const toggleRandomization = useCallback(
+      (optionName, currentValue) => {
+        const option = method.options.find((o) => o.name === optionName);
+        if (!option) return;
+
+        if (option.random) {
+          changeOption(method.name, optionName, undefined, "random");
+        } else {
+          const defaultVal =
+            typeof option.defaultVal === "boolean"
+              ? option.defaultVal
+              : parseFloat(option.defaultVal);
+          let min, max;
+          if (typeof defaultVal === "boolean") {
+            min = false;
+            max = true;
+          } else {
+            min = Math.max(defaultVal * 0.8, 0);
+            max = defaultVal * 1;
+          }
+          changeOption(method.name, optionName, [min, max], "random");
+        }
+      },
+      [method.name, method.options, changeOption]
+    );
+
+    const handleRandomChange = useCallback(
+      (optionName, index, newValue) => {
+        const option = method.options.find((o) => o.name === optionName);
+        if (!option || !option.random) return;
+
+        let newRandom;
+        if (option.type === "boolean") {
+          newRandom = [newValue === "true", newValue === "true"];
+        } else {
+          newRandom = [...option.random];
+          newRandom[index] = parseFloat(newValue);
+        }
+        changeOption(method.name, optionName, newRandom, "random");
+      },
+      [method.options, method.name, changeOption]
+    );
+
+    const handleOptionChange = useCallback(
+      (methodName, optionName, value) => {
+        changeOption(methodName, optionName, value);
+      },
+      [changeOption]
+    );
+
+    return (
+      <SortableWrapper id={id} disabled={method.name === "matrix"}>
+        {({ dragHandleProps, isDragging }) => (
+          <>
+            <div>
+              <MethodBlock
+                method={method}
+                mode="dashboard"
+                moduleMethods={moduleMethods}
+                moduleName={moduleName}
+                dragHandleProps={dragHandleProps}
+                onRemove={handleRemoveMethod}
+                onShowCode={onShowMethodCode}
+                onOptionChange={handleOptionChange}
+                onToggleRandom={toggleRandomization}
+                onRandomRangeChange={handleRandomChange}
+                onAddMissingOption={addMissingOption}
+              />
+            </div>
+
+            {method.name === "matrix" && (
+              <div className="h-auto flex items-center mx-2 text-neutral-800 text-lg font-mono">
+                +
+              </div>
+            )}
+          </>
+        )}
+      </SortableWrapper>
+    );
+  }
+);
+
+SortableItem.displayName = "SortableItem";
+
+export const MethodConfiguratorModal = ({
+  isOpen,
+  onClose,
+  predefinedModules,
+  onEditChannel,
+  onDeleteChannel,
+}) => {
+  const [userData, setUserData] = useAtom(userDataAtom);
+  const [selectedChannel] = useAtom(selectedChannelAtom);
+  const [selectedMethodForCode, setSelectedMethodForCode] = useState(null);
+  const { moduleBase, threeBase } = useMemo(() => getBaseMethodNames(), []);
+
+  const module = useMemo(() => {
+    if (!selectedChannel) return null;
+    return predefinedModules.find((m) => m.name === selectedChannel.moduleType);
+  }, [predefinedModules, selectedChannel]);
+
+  const [activeSetId] = useAtom(activeSetIdAtom);
+  const methodConfigs = useMemo(() => {
+    if (!selectedChannel) return [];
+    const tracks = getActiveSetTracks(userData, activeSetId);
+    const track = tracks[selectedChannel.trackIndex];
+    const moduleData = track?.modulesData[selectedChannel.instanceId] || {
+      constructor: [],
+      methods: {},
+    };
+    const channelKey = selectedChannel.isConstructor
+      ? "constructor"
+      : String(selectedChannel.channelNumber);
+    const configs = selectedChannel.isConstructor
+      ? moduleData.constructor
+      : moduleData.methods[channelKey] || [];
+
+    return configs;
+  }, [userData, selectedChannel]);
+
+  const changeOption = useCallback(
+    (methodName, optionName, value, field = "value") => {
+      if (!selectedChannel) return;
+      updateActiveSet(setUserData, activeSetId, (activeSet) => {
+        const channelKey = selectedChannel.isConstructor
+          ? "constructor"
+          : String(selectedChannel.channelNumber);
+        const track = activeSet.tracks[selectedChannel.trackIndex];
+        const methods = selectedChannel.isConstructor
+          ? track.modulesData[selectedChannel.instanceId].constructor
+          : track.modulesData[selectedChannel.instanceId].methods[channelKey];
+        const method = methods.find((m) => m.name === methodName);
+        if (method) {
+          const option = method.options.find((o) => o.name === optionName);
+          if (option) {
+            option[field] = value;
+          }
+        }
+      });
+    },
+    [selectedChannel, setUserData]
+  );
+
+  const addMethod = useCallback(
+    (methodName) => {
+      if (!selectedChannel || !module) return;
+      const method = module.methods.find((m) => m.name === methodName);
+      if (!method) return;
+
+      const initializedMethod = {
+        name: method.name,
+        options: method?.options?.length
+          ? method.options.map((opt) => ({
+              name: opt.name,
+              value: opt.defaultVal,
+              defaultVal: opt.defaultVal,
+            }))
+          : null,
+      };
+
+      const channelKey = selectedChannel.isConstructor
+        ? "constructor"
+        : String(selectedChannel.channelNumber);
+
+      updateActiveSet(setUserData, activeSetId, (activeSet) => {
+        const track = activeSet.tracks[selectedChannel.trackIndex];
+        const insertMethod = methodName === "matrix" ? "unshift" : "push";
+
+        if (selectedChannel.isConstructor) {
+          track.modulesData[selectedChannel.instanceId].constructor[
+            insertMethod
+          ](initializedMethod);
+        } else {
+          if (
+            !track.modulesData[selectedChannel.instanceId].methods[channelKey]
+          ) {
+            track.modulesData[selectedChannel.instanceId].methods[channelKey] =
+              [];
+          }
+          track.modulesData[selectedChannel.instanceId].methods[channelKey][
+            insertMethod
+          ](initializedMethod);
+        }
+      });
+    },
+    [module, selectedChannel, setUserData]
+  );
+
+  const removeMethod = useCallback(
+    (methodName) => {
+      if (!selectedChannel) return;
+      updateActiveSet(setUserData, activeSetId, (activeSet) => {
+        const channelKey = selectedChannel.isConstructor
+          ? "constructor"
+          : String(selectedChannel.channelNumber);
+        const track = activeSet.tracks[selectedChannel.trackIndex];
+        const methods = selectedChannel.isConstructor
+          ? track.modulesData[selectedChannel.instanceId].constructor
+          : track.modulesData[selectedChannel.instanceId].methods[channelKey];
+        remove(methods, (m) => m.name === methodName);
+      });
+    },
+    [selectedChannel, setUserData]
+  );
+
+  const addMissingOption = useCallback(
+    (methodName, optionName) => {
+      if (!selectedChannel || !module) return;
+      const methodDef = module.methods.find((m) => m.name === methodName);
+      if (!methodDef) return;
+      const optionDef = methodDef.options?.find((o) => o.name === optionName);
+      if (!optionDef) return;
+
+      updateActiveSet(setUserData, activeSetId, (activeSet) => {
+        const track = activeSet.tracks[selectedChannel.trackIndex];
+        const methods = selectedChannel.isConstructor
+          ? track.modulesData[selectedChannel.instanceId].constructor
+          : track.modulesData[selectedChannel.instanceId].methods[
+              selectedChannel.channelName
+            ];
+        const method = methods.find((m) => m.name === methodName);
+        if (method && !method.options.find((o) => o.name === optionName)) {
+          if (!method.options) {
+            method.options = [];
+          }
+          method.options.push({
+            name: optionName,
+            value: optionDef.defaultVal,
+          });
+        }
+      });
+    },
+    [module, selectedChannel, setUserData]
+  );
+
+  const methodLayers = useMemo(() => {
+    return getMethodsByLayer(module, moduleBase, threeBase);
+  }, [module, moduleBase, threeBase]);
+
+  const availableMethods = useMemo(() => {
+    if (!module || !module.methods) return [];
+    return module.methods.filter(
+      (m) => !methodConfigs.some((mc) => mc.name === m.name)
+    );
+  }, [methodConfigs, module]);
+
+  const methodsByLayer = useMemo(() => {
+    const layersWithMethods = methodLayers.map((layer) => {
+      const layerMethods = methodConfigs.filter((method) =>
+        layer.methods.includes(method.name)
+      );
+      return {
+        ...layer,
+        configuredMethods: layerMethods,
+        availableMethods: availableMethods.filter((m) =>
+          layer.methods.includes(m.name)
+        ),
+      };
+    });
+    return layersWithMethods;
+  }, [methodLayers, methodConfigs, availableMethods]);
+
+  if (!isOpen || !selectedChannel || !module) return null;
+
+  const modalTitle = (
+    <>
+      {module.name}{" "}
+      {selectedChannel.isConstructor
+        ? "(Constructor)"
+        : `(Channel ${selectedChannel.channelNumber})`}
+      {selectedChannel.isConstructor ? (
+        <HelpIcon helpText={HELP_TEXT.constructor} />
+      ) : (
+        <HelpIcon helpText={HELP_TEXT.midiChannel} />
+      )}
+    </>
+  );
+
+  return (
+    <>
+      <Modal isOpen={isOpen} onClose={onClose} position="bottom" size="full">
+        <ModalHeader title={modalTitle} onClose={onClose} />
+
+        <div className="flex flex-col gap-6">
+          {methodsByLayer.map((layer, layerIndex) => {
+            const hasMethodsOrAvailable =
+              layer.configuredMethods.length > 0 ||
+              layer.availableMethods.length > 0;
+
+            if (!hasMethodsOrAvailable) return null;
+
+            return (
+              <div key={layer.name} className="px-6 mb-6 border-neutral-800">
+                <div className="flex justify-between items-baseline mb-4">
+                  <div className="uppercase text-neutral-300 text-[11px] relative inline-block">
+                    {layer.name} Methods
+                  </div>
+                  <div className="relative">
+                    <Select
+                      onChange={(e) => {
+                        addMethod(e.target.value);
+                        e.target.value = "";
+                      }}
+                      className="py-1 px-2 min-w-[150px]"
+                      defaultValue=""
+                      disabled={layer.availableMethods.length === 0}
+                      style={{
+                        opacity: layer.availableMethods.length === 0 ? 0.5 : 1,
+                        cursor:
+                          layer.availableMethods.length === 0
+                            ? "not-allowed"
+                            : "pointer",
+                      }}
+                    >
+                      <option value="" disabled className="text-neutral-300/30">
+                        add method
+                      </option>
+                      {layer.availableMethods.map((method) => (
+                        <option
+                          key={method.name}
+                          value={method.name}
+                          className="bg-[#101010]"
+                        >
+                          {method.name}
+                        </option>
+                      ))}
+                    </Select>
+                    <HelpIcon helpText={HELP_TEXT.methods} />
+                  </div>
+                </div>
+
+                {layer.configuredMethods.length > 0 ? (
+                  <SortableList
+                    items={layer.configuredMethods}
+                    strategy={horizontalListSortingStrategy}
+                    onReorder={(oldIndex, newIndex) => {
+                      if (!selectedChannel) return;
+
+                      const currentLayer = layer;
+                      if (!currentLayer) return;
+
+                      updateActiveSet(setUserData, activeSetId, (activeSet) => {
+                        const channelKey = selectedChannel.isConstructor
+                          ? "constructor"
+                          : String(selectedChannel.channelNumber);
+                        const track =
+                          activeSet.tracks[selectedChannel.trackIndex];
+                        const methods = selectedChannel.isConstructor
+                          ? track.modulesData[selectedChannel.instanceId]
+                              .constructor
+                          : track.modulesData[selectedChannel.instanceId]
+                              .methods[channelKey];
+
+                        const reorderedLayer = arrayMove(
+                          currentLayer.configuredMethods,
+                          oldIndex,
+                          newIndex
+                        );
+
+                        const allReorderedMethods = methodsByLayer.reduce(
+                          (acc, l) => {
+                            if (l.name === currentLayer.name) {
+                              return [...acc, ...reorderedLayer];
+                            } else {
+                              return [...acc, ...l.configuredMethods];
+                            }
+                          },
+                          []
+                        );
+
+                        if (selectedChannel.isConstructor) {
+                          track.modulesData[
+                            selectedChannel.instanceId
+                          ].constructor = allReorderedMethods;
+                        } else {
+                          track.modulesData[selectedChannel.instanceId].methods[
+                            channelKey
+                          ] = allReorderedMethods;
+                        }
+                      });
+                    }}
+                  >
+                    <div className="flex items-start overflow-x-auto pt-4">
+                      {layer.configuredMethods.map((method, methodIndex) => (
+                        <React.Fragment key={method.name}>
+                          <SortableItem
+                            id={method.name}
+                            method={method}
+                            handleRemoveMethod={removeMethod}
+                            changeOption={changeOption}
+                            addMissingOption={addMissingOption}
+                            moduleMethods={module ? module.methods : []}
+                            moduleName={module ? module.name : null}
+                            onShowMethodCode={(methodName) => {
+                              setSelectedMethodForCode({
+                                moduleName: module.name,
+                                methodName,
+                              });
+                            }}
+                          />
+                          {methodIndex < layer.configuredMethods.length - 1 && (
+                            <div className="flex-shrink-0 flex items-center w-4 min-h-[40px]">
+                              <div className="w-full h-px bg-neutral-800" />
+                            </div>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </SortableList>
+                ) : (
+                  <div className="text-neutral-500 text-[10px]">
+                    No methods added to {layer.name} layer.
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {!selectedChannel?.isConstructor &&
+          (onEditChannel || onDeleteChannel) && (
+            <ModalFooter>
+              {onEditChannel && (
+                <Button
+                  onClick={() => {
+                    onEditChannel(selectedChannel.channelNumber);
+                    onClose();
+                  }}
+                  type="secondary"
+                  className="text-[11px]"
+                >
+                  EDIT CHANNEL
+                </Button>
+              )}
+              {onDeleteChannel && (
+                <Button
+                  onClick={() => {
+                    onDeleteChannel(selectedChannel.channelNumber);
+                    onClose();
+                  }}
+                  type="secondary"
+                  className="text-[11px]"
+                >
+                  DELETE CHANNEL
+                </Button>
+              )}
+            </ModalFooter>
+          )}
+      </Modal>
+
+      <MethodCodeModal
+        isOpen={!!selectedMethodForCode}
+        onClose={() => setSelectedMethodForCode(null)}
+        moduleName={selectedMethodForCode?.moduleName}
+        methodName={selectedMethodForCode?.methodName}
+      />
+    </>
+  );
+};
