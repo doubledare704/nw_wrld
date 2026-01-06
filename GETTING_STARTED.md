@@ -373,7 +373,7 @@ Once you're comfortable with the sequencer, you can connect external hardware fo
 
 - Close other dev servers using port 9000
 - Run `npm install` again
-- Check Node.js version: `node --version` (should be v18+)
+- Check Node.js version: `node --version` (should be v20+)
 
 For more help, see [Troubleshooting](README.md#troubleshooting) in the README or check [GitHub Issues](https://github.com/aagentah/nw_wrld/issues).
 

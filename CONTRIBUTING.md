@@ -374,7 +374,7 @@ A good bug report includes:
 
 ```
 - OS: macOS 13.2 / Windows 11
-- Node version: 18.12.0
+- Node version: 20.x.x
 - App version: 1.0.0
 ```
 

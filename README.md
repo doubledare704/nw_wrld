@@ -4,7 +4,7 @@ nw_wrld is an event-driven sequencer for triggering visuals using web technologi
 
 Visuals can be triggered via the built-in 16-step sequencer or by configuring external MIDI/OSC inputs.
 
-![Node Version](https://img.shields.io/badge/node-%5E18.0.0-brightgreen)
+![Node Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
 ![Electron](https://img.shields.io/badge/electron-v39.2.7-blue)
 
 ---
@@ -37,7 +37,7 @@ Download and install the DMG from [Releases](https://github.com/aagentah/nw_wrld
 
 Build from source to contribute or customize:
 
-**Prerequisites:** Node.js v18+ and basic terminal knowledge
+**Prerequisites:** Node.js v20+ and basic terminal knowledge
 
 ```bash
 # 1. Clone the repository
