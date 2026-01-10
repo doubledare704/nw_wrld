@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAtom } from "jotai";
 import { Modal } from "../shared/Modal.jsx";
 import { ModalHeader } from "../components/ModalHeader.js";
@@ -10,6 +10,20 @@ import { DEFAULT_GLOBAL_MAPPINGS } from "../../shared/config/defaultConfig.js";
 export const InputMappingsModal = ({ isOpen, onClose }) => {
   const [userData, setUserData] = useAtom(userDataAtom);
   const [activeTab, setActiveTab] = useState("midi");
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
+    }
+    if (wasOpenRef.current) return;
+    wasOpenRef.current = true;
+
+    const inputType = userData?.config?.input?.type;
+    const nextTab = inputType === "osc" ? "osc" : "midi";
+    setActiveTab(nextTab);
+  }, [isOpen, userData?.config?.input?.type]);
 
   const trackMappings = userData.config?.trackMappings || {};
   const channelMappings = userData.config?.channelMappings || {};

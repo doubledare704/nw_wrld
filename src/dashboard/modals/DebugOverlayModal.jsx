@@ -273,7 +273,8 @@ export const DebugOverlayModal = React.memo(
         >
           {visibleLogs.length === 0 ? (
             <div className="text-neutral-300/30">
-              No debug logs yet. MIDI events will appear here.
+              No debug logs yet. External inputs, track selections, and method
+              triggers will appear here.
             </div>
           ) : (
             visibleLogs.map((log, index) => (

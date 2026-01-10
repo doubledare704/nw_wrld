@@ -267,6 +267,13 @@ export const SettingsModal = ({
   workspacePath,
   onSelectWorkspace,
 }) => {
+  const normalizedInputType = inputConfig?.type === "osc" ? "osc" : "midi";
+  const signalSourceValue = config.sequencerMode
+    ? "sequencer"
+    : normalizedInputType === "osc"
+    ? "external-osc"
+    : "external-midi";
+
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <ModalHeader title="SETTINGS" onClose={onClose} />
@@ -281,25 +288,10 @@ export const SettingsModal = ({
             <div className="space-y-2">
               <div className="flex items-center gap-3 py-1">
                 <RadioButton
-                  id="signal-external"
-                  name="signalSource"
-                  value="external"
-                  checked={!config.sequencerMode}
-                  onChange={() => updateConfig({ sequencerMode: false })}
-                />
-                <label
-                  htmlFor="signal-external"
-                  className="cursor-pointer text-[11px] font-mono text-neutral-300"
-                >
-                  External (MIDI/OSC)
-                </label>
-              </div>
-              <div className="flex items-center gap-3 py-1">
-                <RadioButton
                   id="signal-sequencer"
                   name="signalSource"
                   value="sequencer"
-                  checked={config.sequencerMode}
+                  checked={signalSourceValue === "sequencer"}
                   onChange={() => updateConfig({ sequencerMode: true })}
                 />
                 <label
@@ -309,34 +301,48 @@ export const SettingsModal = ({
                   Sequencer (Pattern Grid)
                 </label>
               </div>
+              <div className="flex items-center gap-3 py-1">
+                <RadioButton
+                  id="signal-external-midi"
+                  name="signalSource"
+                  value="external-midi"
+                  checked={signalSourceValue === "external-midi"}
+                  onChange={() => {
+                    updateConfig({ sequencerMode: false });
+                    setInputConfig({ ...inputConfig, type: "midi" });
+                  }}
+                />
+                <label
+                  htmlFor="signal-external-midi"
+                  className="cursor-pointer text-[11px] font-mono text-neutral-300"
+                >
+                  External MIDI
+                </label>
+              </div>
+              <div className="flex items-center gap-3 py-1">
+                <RadioButton
+                  id="signal-external-osc"
+                  name="signalSource"
+                  value="external-osc"
+                  checked={signalSourceValue === "external-osc"}
+                  onChange={() => {
+                    updateConfig({ sequencerMode: false });
+                    setInputConfig({ ...inputConfig, type: "osc" });
+                  }}
+                />
+                <label
+                  htmlFor="signal-external-osc"
+                  className="cursor-pointer text-[11px] font-mono text-neutral-300"
+                >
+                  External OSC
+                </label>
+              </div>
             </div>
           </div>
 
           {!config.sequencerMode && (
             <>
-              <div className="pl-12">
-                <div className="mb-1 text-[11px] relative inline-block">
-                  <span className="opacity-50">Input Source:</span>
-                  <HelpIcon helpText={HELP_TEXT.inputType} />
-                </div>
-                <Select
-                  id="inputType"
-                  value={inputConfig.type}
-                  onChange={(e) =>
-                    setInputConfig({ ...inputConfig, type: e.target.value })
-                  }
-                  className="py-1 w-full"
-                >
-                  <option value="midi" className="bg-[#101010]">
-                    MIDI
-                  </option>
-                  <option value="osc" className="bg-[#101010]">
-                    OSC
-                  </option>
-                </Select>
-              </div>
-
-              {inputConfig.type === "midi" && (
+              {normalizedInputType === "midi" && (
                 <>
                   <div className="pl-12">
                     <div className="opacity-50 mb-1 text-[11px]">
@@ -444,7 +450,7 @@ export const SettingsModal = ({
                 </>
               )}
 
-              {inputConfig.type === "osc" && (
+              {normalizedInputType === "osc" && (
                 <>
                   <div className="pl-12">
                     <div className="mb-1 text-[11px] relative inline-block">
