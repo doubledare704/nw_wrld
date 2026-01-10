@@ -28,6 +28,9 @@ const nwWrldBridge = {
     isRequired: () => ipcRenderer.sendSync("bridge:project:isRequired"),
     isDirAvailable: () => ipcRenderer.sendSync("bridge:project:isDirAvailable"),
   },
+  os: {
+    openExternal: (url) => ipcRenderer.sendSync("bridge:os:openExternal", url),
+  },
   sandbox: {
     registerToken: (token) =>
       ipcRenderer.sendSync("bridge:sandbox:registerToken", token),
@@ -73,6 +76,8 @@ const nwWrldBridge = {
       ipcRenderer.sendSync("bridge:app:getMethodCode", moduleName, methodName),
     getKickMp3ArrayBuffer: () =>
       ipcRenderer.sendSync("bridge:app:getKickMp3ArrayBuffer"),
+    getVersion: () => ipcRenderer.sendSync("bridge:app:getVersion"),
+    getRepositoryUrl: () => ipcRenderer.sendSync("bridge:app:getRepositoryUrl"),
     isPackaged: () => ipcRenderer.sendSync("bridge:app:isPackaged"),
   },
   messaging: {

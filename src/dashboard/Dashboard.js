@@ -71,6 +71,7 @@ import { SettingsModal } from "./modals/SettingsModal.jsx";
 import { InputMappingsModal } from "./modals/InputMappingsModal.jsx";
 import { SelectSetModal } from "./modals/SelectSetModal.jsx";
 import { SelectTrackModal } from "./modals/SelectTrackModal.jsx";
+import { ReleaseNotesModal } from "./modals/ReleaseNotesModal.jsx";
 import { MethodConfiguratorModal } from "./modals/MethodConfiguratorModal.jsx";
 import { TrackItem } from "./components/track/TrackItem.jsx";
 import { DashboardHeader } from "./components/DashboardHeader.jsx";
@@ -241,6 +242,7 @@ const Dashboard = () => {
   const [isManageModulesModalOpen, setIsManageModulesModalOpen] =
     useState(false);
   const [isDebugOverlayOpen, setIsDebugOverlayOpen] = useState(false);
+  const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
   const [isInputMappingsModalOpen, setIsInputMappingsModalOpen] =
     useState(false);
   const [confirmationModal, setConfirmationModal] = useState(null);
@@ -1189,6 +1191,7 @@ const Dashboard = () => {
         onModules={() => setIsManageModulesModalOpen(true)}
         onSettings={() => setIsSettingsModalOpen(true)}
         onDebugOverlay={() => setIsDebugOverlayOpen(true)}
+        onReleases={() => setIsReleaseNotesOpen(true)}
       />
 
       <div className="flex-1 overflow-y-auto pt-12 pb-32">
@@ -1329,6 +1332,10 @@ const Dashboard = () => {
       <InputMappingsModal
         isOpen={isInputMappingsModalOpen}
         onClose={() => setIsInputMappingsModalOpen(false)}
+      />
+      <ReleaseNotesModal
+        isOpen={isReleaseNotesOpen}
+        onClose={() => setIsReleaseNotesOpen(false)}
       />
       <AddModuleModal
         isOpen={isAddModuleModalOpen}

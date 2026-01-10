@@ -1122,6 +1122,77 @@ ipcMain.on("bridge:app:isPackaged", (event) => {
   }
 });
 
+ipcMain.on("bridge:app:getVersion", (event) => {
+  try {
+    const tryReadVersion = (p) => {
+      try {
+        if (!p || typeof p !== "string") return null;
+        if (!fs.existsSync(p)) return null;
+        const raw = fs.readFileSync(p, "utf-8");
+        const pkg = JSON.parse(raw);
+        const v = pkg?.version;
+        return typeof v === "string" && v.trim() ? v.trim() : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const fromAppPath = tryReadVersion(
+      path.join(app.getAppPath(), "package.json")
+    );
+    if (fromAppPath) {
+      event.returnValue = fromAppPath;
+      return;
+    }
+
+    const fromProjectRoot = tryReadVersion(
+      path.join(__dirname, "..", "package.json")
+    );
+    if (fromProjectRoot) {
+      event.returnValue = fromProjectRoot;
+      return;
+    }
+
+    event.returnValue = app.getVersion();
+  } catch {
+    event.returnValue = null;
+  }
+});
+
+ipcMain.on("bridge:app:getRepositoryUrl", (event) => {
+  try {
+    const tryRead = (p) => {
+      try {
+        if (!p || typeof p !== "string") return null;
+        if (!fs.existsSync(p)) return null;
+        const raw = fs.readFileSync(p, "utf-8");
+        const pkg = JSON.parse(raw);
+        const repo = pkg?.repository;
+        const url =
+          typeof repo === "string"
+            ? repo
+            : repo && typeof repo.url === "string"
+            ? repo.url
+            : null;
+        return url || null;
+      } catch {
+        return null;
+      }
+    };
+
+    const fromAppPath = tryRead(path.join(app.getAppPath(), "package.json"));
+    if (fromAppPath) {
+      event.returnValue = fromAppPath;
+      return;
+    }
+
+    const fromSrcDir = tryRead(path.join(__dirname, "..", "package.json"));
+    event.returnValue = fromSrcDir || null;
+  } catch {
+    event.returnValue = null;
+  }
+});
+
 ipcMain.on("bridge:app:getMethodCode", (event, moduleName, methodName) => {
   try {
     const moduleBasePath = path.join(

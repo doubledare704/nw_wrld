@@ -1,6 +1,7 @@
 import React from "react";
-import { FaBars, FaCog, FaCode, FaMusic } from "react-icons/fa";
+import { FaBars, FaCog, FaCode, FaMusic, FaTag } from "react-icons/fa";
 import { Button } from "./Button.js";
+import { useUpdateCheck } from "../core/hooks/useUpdateCheck.js";
 
 export const DashboardHeader = ({
   onSets,
@@ -8,7 +9,18 @@ export const DashboardHeader = ({
   onModules,
   onSettings,
   onDebugOverlay,
+  onReleases,
 }) => {
+  const update = useUpdateCheck();
+  const hasUpdate = update.status === "updateAvailable";
+
+  const handleOpenUpdates = () => {
+    if (typeof onReleases === "function") {
+      onReleases();
+      return;
+    }
+  };
+
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-[#101010] border-b border-neutral-800 px-6 py-4">
       <div className="flex justify-between items-center">
@@ -30,7 +42,25 @@ export const DashboardHeader = ({
           </Button>
         </div>
         <div className="flex items-center gap-6">
-          <div className="opacity-50 text-[11px] text-neutral-300">nw_wrld</div>
+          <div className="flex items-center gap-2">
+            <div className="opacity-50 text-[11px] text-neutral-300">
+              nw_wrld
+            </div>
+            <button
+              type="button"
+              onClick={handleOpenUpdates}
+              className={`relative flex items-center ${
+                hasUpdate
+                  ? "text-red-500/80 opacity-100"
+                  : "text-neutral-300 opacity-50"
+              }`}
+            >
+              <FaTag size={12} className="opacity-75" />
+              {hasUpdate ? (
+                <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500/80" />
+              ) : null}
+            </button>
+          </div>
         </div>
       </div>
     </div>
