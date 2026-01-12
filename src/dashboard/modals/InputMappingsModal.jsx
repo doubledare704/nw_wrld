@@ -285,103 +285,7 @@ export const InputMappingsModal = ({ isOpen, onClose }) => {
         <div className="flex flex-col gap-6">
           <div>
             <div className="text-neutral-300 text-[11px] mb-3 font-mono">
-              Track Trigger Mappings (1-{trackSlots}):
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {Array.from({ length: trackSlots }, (_, i) => i + 1).map(
-                (slot) => (
-                  <div key={slot} className="flex items-center gap-2">
-                    <span className="text-neutral-500 text-[11px] font-mono w-12">
-                      Track {slot}:
-                    </span>
-                    {isMidi ? (
-                      midiMode === "pitchClass" ? (
-                        <Select
-                          value={(() => {
-                            const current =
-                              trackMappings.midi?.pitchClass?.[slot] ??
-                              trackMappings.midi?.[slot];
-                            if (typeof current === "number")
-                              return String(current);
-                            const pc = parsePitchClass(current);
-                            return pc === null ? "" : String(pc);
-                          })()}
-                          onChange={(e) =>
-                            updateTrackMapping(
-                              slot,
-                              parseInt(e.target.value, 10)
-                            )
-                          }
-                          className="flex-1 text-[11px]"
-                        >
-                          <option value="" disabled>
-                            select pitch class…
-                          </option>
-                          {pitchClassOptions.map((opt) => (
-                            <option key={opt.value} value={String(opt.value)}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </Select>
-                      ) : (
-                        <Select
-                          value={(() => {
-                            const current =
-                              trackMappings.midi?.exactNote?.[slot];
-                            return isValidMidiNoteNumber(current)
-                              ? String(current)
-                              : "0";
-                          })()}
-                          onChange={(e) =>
-                            updateTrackMapping(
-                              slot,
-                              parseInt(e.target.value, 10)
-                            )
-                          }
-                          className="flex-1 text-[11px]"
-                        >
-                          {exactNoteOptions.map((opt) => {
-                            const selected =
-                              trackMappings.midi?.exactNote?.[slot];
-                            const usedByOtherSlot = Object.entries(
-                              trackMappings.midi?.exactNote || {}
-                            ).some(([s, v]) => {
-                              if (parseInt(s, 10) === slot) return false;
-                              return v === opt.value;
-                            });
-                            const disabled =
-                              usedByOtherSlot && opt.value !== selected;
-                            return (
-                              <option
-                                key={opt.value}
-                                value={String(opt.value)}
-                                disabled={disabled}
-                              >
-                                {opt.label}
-                              </option>
-                            );
-                          })}
-                        </Select>
-                      )
-                    ) : (
-                      <TextInput
-                        value={trackMappings.osc?.[slot] ?? ""}
-                        onChange={(e) =>
-                          updateTrackMapping(slot, e.target.value)
-                        }
-                        className="flex-1 text-[11px]"
-                        placeholder={`/track/${slot}`}
-                      />
-                    )}
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-
-          <div>
-            <div className="text-neutral-300 text-[11px] mb-3 font-mono">
-              Trigger Slot Mappings (1-{triggerSlots}):
+              Method Trigger Mappings (1-{triggerSlots}):
             </div>
             <div className="grid grid-cols-2 gap-2">
               {Array.from({ length: triggerSlots }, (_, i) => i + 1).map(
@@ -467,6 +371,102 @@ export const InputMappingsModal = ({ isOpen, onClose }) => {
                         }
                         className="flex-1 text-[11px]"
                         placeholder={`/ch/${slot}`}
+                      />
+                    )}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-neutral-300 text-[11px] mb-3 font-mono">
+              Track Select Mappings (1-{trackSlots}):
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {Array.from({ length: trackSlots }, (_, i) => i + 1).map(
+                (slot) => (
+                  <div key={slot} className="flex items-center gap-2">
+                    <span className="text-neutral-500 text-[11px] font-mono w-12">
+                      Track {slot}:
+                    </span>
+                    {isMidi ? (
+                      midiMode === "pitchClass" ? (
+                        <Select
+                          value={(() => {
+                            const current =
+                              trackMappings.midi?.pitchClass?.[slot] ??
+                              trackMappings.midi?.[slot];
+                            if (typeof current === "number")
+                              return String(current);
+                            const pc = parsePitchClass(current);
+                            return pc === null ? "" : String(pc);
+                          })()}
+                          onChange={(e) =>
+                            updateTrackMapping(
+                              slot,
+                              parseInt(e.target.value, 10)
+                            )
+                          }
+                          className="flex-1 text-[11px]"
+                        >
+                          <option value="" disabled>
+                            select pitch class…
+                          </option>
+                          {pitchClassOptions.map((opt) => (
+                            <option key={opt.value} value={String(opt.value)}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        <Select
+                          value={(() => {
+                            const current =
+                              trackMappings.midi?.exactNote?.[slot];
+                            return isValidMidiNoteNumber(current)
+                              ? String(current)
+                              : "0";
+                          })()}
+                          onChange={(e) =>
+                            updateTrackMapping(
+                              slot,
+                              parseInt(e.target.value, 10)
+                            )
+                          }
+                          className="flex-1 text-[11px]"
+                        >
+                          {exactNoteOptions.map((opt) => {
+                            const selected =
+                              trackMappings.midi?.exactNote?.[slot];
+                            const usedByOtherSlot = Object.entries(
+                              trackMappings.midi?.exactNote || {}
+                            ).some(([s, v]) => {
+                              if (parseInt(s, 10) === slot) return false;
+                              return v === opt.value;
+                            });
+                            const disabled =
+                              usedByOtherSlot && opt.value !== selected;
+                            return (
+                              <option
+                                key={opt.value}
+                                value={String(opt.value)}
+                                disabled={disabled}
+                              >
+                                {opt.label}
+                              </option>
+                            );
+                          })}
+                        </Select>
+                      )
+                    ) : (
+                      <TextInput
+                        value={trackMappings.osc?.[slot] ?? ""}
+                        onChange={(e) =>
+                          updateTrackMapping(slot, e.target.value)
+                        }
+                        className="flex-1 text-[11px]"
+                        placeholder={`/track/${slot}`}
                       />
                     )}
                   </div>

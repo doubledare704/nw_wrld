@@ -209,18 +209,18 @@ Most DAW setups send notes on **MIDI Channel 1** unless you explicitly route or 
 - **Option A (simplest): Single MIDI channel**
 
   - In nw_wrld → Settings → External (MIDI/OSC) → MIDI:
-    - **Track Select MIDI Channel**: `1`
     - **Method Triggers MIDI Channel**: `1`
+    - **Track Select MIDI Channel**: `1`
   - Use **Settings → Configure Mappings** to choose either:
     - **MIDI (Pitch Class)**: octave-agnostic mapping using C..B (avoids DAW octave-name differences)
     - **MIDI (Exact Note)**: octave-specific mapping using full MIDI note numbers (0–127)
   - Then map which triggers activate track selection vs method triggers.
 
 - **Option B (clean separation): Split MIDI channels**
-  - In your DAW, route track-selection notes to Channel 1 and trigger notes to Channel 2 (commonly done with separate MIDI routing tracks/devices).
+  - In your DAW, route method trigger notes to Channel 1 and track-selection notes to Channel 2 (commonly done with separate MIDI routing tracks/devices).
   - In nw_wrld → Settings:
-    - **Track Select MIDI Channel**: `1`
-    - **Method Triggers MIDI Channel**: `2`
+    - **Method Triggers MIDI Channel**: `1`
+    - **Track Select MIDI Channel**: `2`
 
 ### Step 3: Perform Live
 

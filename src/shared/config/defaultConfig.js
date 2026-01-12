@@ -1,8 +1,8 @@
 const DEFAULT_INPUT_CONFIG = {
   type: "midi",
   deviceName: "IAC Driver Bus 1",
-  trackSelectionChannel: 1,
-  methodTriggerChannel: 2,
+  trackSelectionChannel: 2,
+  methodTriggerChannel: 1,
   velocitySensitive: false,
   noteMatchMode: "pitchClass",
   port: 8000,

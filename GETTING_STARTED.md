@@ -305,12 +305,12 @@ Many DAWs send note events on **MIDI Channel 1** by default. nw_wrld lets you ch
 
 - **Simplest setup (one channel)**:
 
-  - Set both **Track Select MIDI Channel** and **Method Triggers MIDI Channel** to `1`.
+  - Set both **Method Triggers MIDI Channel** and **Track Select MIDI Channel** to `1`.
   - Use **Settings → Configure Mappings** to choose which pitch classes (C..B) activate track selection vs method triggers.
 
 - **Clean separation (two channels)**:
-  - Route track selection notes to Channel 1 and trigger notes to Channel 2 in your DAW.
-  - Set **Track Select MIDI Channel** = `1` and **Method Triggers MIDI Channel** = `2` in nw_wrld.
+  - Route method trigger notes to Channel 1 and track selection notes to Channel 2 in your DAW.
+  - Set **Method Triggers MIDI Channel** = `1` and **Track Select MIDI Channel** = `2` in nw_wrld.
 
 ---
 

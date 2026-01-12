@@ -400,17 +400,17 @@ export const SettingsModal = ({
                     <div className="flex flex-col gap-3">
                       <div>
                         <div className="opacity-50 mb-1 text-[11px]">
-                          Track Select MIDI channel:
+                          Method Triggers MIDI channel:
                         </div>
                         <DraftIntInput
-                          value={inputConfig.trackSelectionChannel ?? 1}
-                          fallback={inputConfig.trackSelectionChannel ?? 1}
+                          value={inputConfig.methodTriggerChannel ?? 1}
+                          fallback={inputConfig.methodTriggerChannel ?? 1}
                           onCommit={(next) =>
                             setInputConfig({
                               ...inputConfig,
-                              trackSelectionChannel: clampMidiChannel(
+                              methodTriggerChannel: clampMidiChannel(
                                 next,
-                                inputConfig.trackSelectionChannel ?? 1
+                                inputConfig.methodTriggerChannel ?? 1
                               ),
                             })
                           }
@@ -422,17 +422,17 @@ export const SettingsModal = ({
                       </div>
                       <div>
                         <div className="opacity-50 mb-1 text-[11px]">
-                          Method Triggers MIDI channel:
+                          Track Select MIDI channel:
                         </div>
                         <DraftIntInput
-                          value={inputConfig.methodTriggerChannel ?? 2}
-                          fallback={inputConfig.methodTriggerChannel ?? 2}
+                          value={inputConfig.trackSelectionChannel ?? 2}
+                          fallback={inputConfig.trackSelectionChannel ?? 2}
                           onCommit={(next) =>
                             setInputConfig({
                               ...inputConfig,
-                              methodTriggerChannel: clampMidiChannel(
+                              trackSelectionChannel: clampMidiChannel(
                                 next,
-                                inputConfig.methodTriggerChannel ?? 2
+                                inputConfig.trackSelectionChannel ?? 2
                               ),
                             })
                           }
