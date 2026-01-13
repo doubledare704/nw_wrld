@@ -28,3 +28,10 @@ Steps to validate the change:
 ## Notes for reviewers
 
 Anything risky, or areas to pay attention to:
+
+## Review context (please read / use as ground truth)
+
+- `README.md`
+- `MODULE_DEVELOPMENT.md`
+- `CONTRIBUTING.md`
+- `RUNTIME_TS_TESTING_GUIDELINES.md`
