@@ -13,7 +13,58 @@ const {
 const path = require("path");
 const fs = require("fs");
 const { pathToFileURL } = require("url");
-const InputManager = require("./main/InputManager");
+const InputManagerModule = require(path.join(
+  __dirname,
+  "..",
+  "dist",
+  "runtime",
+  "main",
+  "InputManager.js"
+));
+const InputManager = InputManagerModule?.default || InputManagerModule;
+const { readJsonWithBackup, readJsonWithBackupSync } = require(path.join(
+  __dirname,
+  "..",
+  "dist",
+  "runtime",
+  "shared",
+  "json",
+  "readJsonWithBackup.js"
+));
+const { sanitizeJsonForBridge } = require(path.join(
+  __dirname,
+  "..",
+  "dist",
+  "runtime",
+  "shared",
+  "validation",
+  "jsonBridgeValidation.js"
+));
+const {
+  normalizeSandboxResult,
+  normalizeSandboxRequestProps,
+} = require(path.join(
+  __dirname,
+  "..",
+  "dist",
+  "runtime",
+  "shared",
+  "validation",
+  "sandboxValidation.js"
+));
+const {
+  normalizeModuleSummaries,
+  normalizeModuleWithMeta,
+  normalizeModuleUrlResult,
+} = require(path.join(
+  __dirname,
+  "..",
+  "dist",
+  "runtime",
+  "shared",
+  "validation",
+  "workspaceValidation.js"
+));
 const {
   atomicWriteFile,
   atomicWriteFileSync,
@@ -659,13 +710,24 @@ ipcMain.handle("sandbox:request", async (event, payload) => {
     return { ok: false, error: "TOKEN_NOT_OWNED" };
   }
 
+  let safeProps = {};
+  try {
+    const normalized = normalizeSandboxRequestProps(type, props);
+    if (!normalized || normalized.ok !== true) {
+      return { ok: false, error: normalized?.error || "INVALID_PROPS" };
+    }
+    safeProps = normalized.props || {};
+  } catch (e) {
+    return { ok: false, error: e?.message || "INVALID_PROPS" };
+  }
+
   const requestId = `${Date.now()}:${Math.random().toString(16).slice(2)}`;
   const sent = sendToSandbox({
     __nwWrldSandbox: true,
     token,
     type,
     requestId,
-    props,
+    props: safeProps,
   });
   if (!sent) return { ok: false, error: "SANDBOX_UNAVAILABLE" };
 
@@ -699,7 +761,9 @@ ipcMain.on("sandbox:toMain", async (event, payload) => {
       clearTimeout(pending.timeout);
     } catch {}
     try {
-      pending.resolve(data.result);
+      pending.resolve(
+        normalizeSandboxResult(String(data.type || ""), data.result)
+      );
     } catch {}
     return;
   }
@@ -805,7 +869,7 @@ ipcMain.handle("bridge:workspace:listModuleSummaries", async (event) => {
     })
   );
 
-  return summaries.filter(Boolean);
+  return normalizeModuleSummaries(summaries);
 });
 
 ipcMain.handle(
@@ -823,7 +887,7 @@ ipcMain.handle(
         fs.promises.stat(fullPath),
         fs.promises.readFile(fullPath, "utf-8"),
       ]);
-      return { text, mtimeMs: stat.mtimeMs };
+      return normalizeModuleWithMeta({ text, mtimeMs: stat.mtimeMs });
     } catch {
       return null;
     }
@@ -841,7 +905,7 @@ ipcMain.handle("bridge:workspace:getModuleUrl", async (event, moduleName) => {
   try {
     const stat = await fs.promises.stat(fullPath);
     const url = `${pathToFileURL(fullPath).href}?t=${stat.mtimeMs}`;
-    return { url, mtimeMs: stat.mtimeMs };
+    return normalizeModuleUrlResult({ url, mtimeMs: stat.mtimeMs });
   } catch {
     return null;
   }
@@ -1002,18 +1066,8 @@ ipcMain.handle("bridge:json:read", async (event, filename, defaultValue) => {
   }
   const dir = getJsonDirForBridge(projectDir);
   const filePath = path.join(dir, safeName);
-  try {
-    const data = await fs.promises.readFile(filePath, "utf-8");
-    return JSON.parse(data);
-  } catch {
-    try {
-      const backupPath = `${filePath}.backup`;
-      const backupData = await fs.promises.readFile(backupPath, "utf-8");
-      return JSON.parse(backupData);
-    } catch {
-      return defaultValue;
-    }
-  }
+  const value = await readJsonWithBackup(filePath, defaultValue);
+  return sanitizeJsonForBridge(safeName, value, defaultValue);
 });
 
 ipcMain.on("bridge:json:readSync", (event, filename, defaultValue) => {
@@ -1030,18 +1084,8 @@ ipcMain.on("bridge:json:readSync", (event, filename, defaultValue) => {
   }
   const dir = getJsonDirForBridge(projectDir);
   const filePath = path.join(dir, safeName);
-  try {
-    const data = fs.readFileSync(filePath, "utf-8");
-    event.returnValue = JSON.parse(data);
-  } catch {
-    try {
-      const backupPath = `${filePath}.backup`;
-      const backupData = fs.readFileSync(backupPath, "utf-8");
-      event.returnValue = JSON.parse(backupData);
-    } catch {
-      event.returnValue = defaultValue;
-    }
-  }
+  const value = readJsonWithBackupSync(filePath, defaultValue);
+  event.returnValue = sanitizeJsonForBridge(safeName, value, defaultValue);
 });
 
 ipcMain.handle("bridge:json:write", async (event, filename, data) => {

@@ -1,14 +1,165 @@
-const { WebMidi } = require("webmidi");
-const osc = require("osc");
-const { DEFAULT_INPUT_CONFIG } = require("../shared/config/defaultConfig");
-const INPUT_STATUS = require("../shared/constants/inputStatus");
-const {
-  isValidOSCTrackAddress,
-  isValidOSCChannelAddress,
-} = require("../shared/validation/oscValidation");
+import { WebMidi, type MidiInput, type NoteOnEvent } from "webmidi";
+import { UDPPort, type OscMessage, type OscError } from "osc";
+import type {
+  InputEventPayload,
+  InputStatus,
+  InputStatusPayload,
+  MidiDeviceInfo,
+} from "../types/input";
+import type { InputConfig } from "../types/userData";
+const path = require("node:path");
+
+const PROJECT_ROOT = path.join(__dirname, "..", "..", "..");
+const requireRuntimeOrSrc = (
+  runtimePath: string,
+  srcPathFromSrcRoot: string
+): unknown => {
+  try {
+    return require(runtimePath);
+  } catch {}
+  return require(path.join(PROJECT_ROOT, "src", srcPathFromSrcRoot));
+};
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  Boolean(v) &&
+  typeof v === "object" &&
+  !Array.isArray(v) &&
+  Object.prototype.toString.call(v) === "[object Object]";
+
+const isInputStatusValue = (v: unknown): v is InputStatus =>
+  v === "disconnected" || v === "connecting" || v === "connected" || v === "error";
+
+const isInputStatusModule = (
+  v: unknown
+): v is {
+  DISCONNECTED: InputStatus;
+  CONNECTING: InputStatus;
+  CONNECTED: InputStatus;
+  ERROR: InputStatus;
+} =>
+  isPlainObject(v) &&
+  isInputStatusValue(v.DISCONNECTED) &&
+  isInputStatusValue(v.CONNECTING) &&
+  isInputStatusValue(v.CONNECTED) &&
+  isInputStatusValue(v.ERROR);
+
+const isDefaultConfigModule = (
+  v: unknown
+): v is { DEFAULT_INPUT_CONFIG: unknown } =>
+  isPlainObject(v) && Object.prototype.hasOwnProperty.call(v, "DEFAULT_INPUT_CONFIG");
+
+const isOscValidationModule = (
+  v: unknown
+): v is {
+  isValidOSCTrackAddress: (address: string) => boolean;
+  isValidOSCChannelAddress: (address: string) => boolean;
+} =>
+  isPlainObject(v) &&
+  typeof v.isValidOSCTrackAddress === "function" &&
+  typeof v.isValidOSCChannelAddress === "function";
+
+const isInputEventValidationModule = (
+  v: unknown
+): v is { normalizeInputEventPayload: (payload: unknown) => InputEventPayload | null } =>
+  isPlainObject(v) && typeof v.normalizeInputEventPayload === "function";
+
+const defaultConfigMod = requireRuntimeOrSrc(
+  "../shared/config/defaultConfig",
+  path.join("shared", "config", "defaultConfig")
+);
+const DEFAULT_INPUT_CONFIG =
+  (isDefaultConfigModule(defaultConfigMod) ? defaultConfigMod.DEFAULT_INPUT_CONFIG : null) ??
+  {
+    type: "midi",
+    deviceName: "IAC Driver Bus 1",
+    trackSelectionChannel: 2,
+    methodTriggerChannel: 1,
+    velocitySensitive: false,
+    noteMatchMode: "pitchClass",
+    port: 8000,
+  };
+
+const inputStatusMod = requireRuntimeOrSrc(
+  "../shared/constants/inputStatus",
+  path.join("shared", "constants", "inputStatus")
+);
+const INPUT_STATUS: {
+  DISCONNECTED: InputStatus;
+  CONNECTING: InputStatus;
+  CONNECTED: InputStatus;
+  ERROR: InputStatus;
+} = isInputStatusModule(inputStatusMod)
+  ? inputStatusMod
+  : {
+      DISCONNECTED: "disconnected",
+      CONNECTING: "connecting",
+      CONNECTED: "connected",
+      ERROR: "error",
+    };
+
+const oscValidationMod = requireRuntimeOrSrc(
+  "../shared/validation/oscValidation",
+  path.join("shared", "validation", "oscValidation")
+);
+const isValidOSCTrackAddress = isOscValidationModule(oscValidationMod)
+  ? oscValidationMod.isValidOSCTrackAddress
+  : (address: string) => {
+      const trimmed = String(address || "").trim();
+      return trimmed.startsWith("/track/") || trimmed === "/track";
+    };
+const isValidOSCChannelAddress = isOscValidationModule(oscValidationMod)
+  ? oscValidationMod.isValidOSCChannelAddress
+  : (address: string) => {
+      const trimmed = String(address || "").trim();
+      return trimmed.startsWith("/ch/") || trimmed.startsWith("/channel/");
+    };
+
+const inputEventValidationMod = requireRuntimeOrSrc(
+  "../shared/validation/inputEventValidation",
+  path.join("shared", "validation", "inputEventValidation")
+);
+const normalizeInputEventPayload = isInputEventValidationModule(inputEventValidationMod)
+  ? inputEventValidationMod.normalizeInputEventPayload
+  : () => null;
+
+type RuntimeMidiConfig = Omit<InputConfig, "type"> & {
+  type: "midi";
+  deviceId?: string;
+  noteMatchMode?: string;
+};
+
+type RuntimeOscConfig = Omit<InputConfig, "type"> & {
+  type: "osc";
+  noteMatchMode?: string;
+};
+
+type RuntimeInputConfig = RuntimeMidiConfig | RuntimeOscConfig;
+
+type WindowWebContents = {
+  isDestroyed(): boolean;
+  send(channel: "input-event", payload: InputEventPayload): void;
+  send(channel: "input-status", payload: InputStatusPayload): void;
+  send(channel: string, payload: object): void;
+};
+
+type WindowLike = {
+  isDestroyed(): boolean;
+  webContents?: WindowWebContents | null;
+};
+
+type CurrentSource =
+  | { type: "midi"; instance: MidiInput }
+  | { type: "osc"; instance: UDPPort }
+  | null;
 
 class InputManager {
-  constructor(dashboardWindow, projectorWindow) {
+  dashboard: WindowLike | null;
+  projector: WindowLike | null;
+  currentSource: CurrentSource;
+  config: RuntimeInputConfig | null;
+  connectionStatus: InputStatus;
+
+  constructor(dashboardWindow: WindowLike, projectorWindow: WindowLike) {
     this.dashboard = dashboardWindow;
     this.projector = projectorWindow;
     this.currentSource = null;
@@ -16,14 +167,20 @@ class InputManager {
     this.connectionStatus = INPUT_STATUS.DISCONNECTED;
   }
 
-  broadcast(eventType, data) {
+  broadcast(eventType: InputEventPayload["type"], data: object) {
     const payload = {
       type: eventType,
       data: {
-        ...data,
+        ...(data as object),
         timestamp: Date.now() / 1000,
       },
     };
+
+    const normalized = normalizeInputEventPayload(payload);
+    if (!normalized) {
+      console.warn("[InputManager] Invalid input-event payload:", payload);
+      return;
+    }
 
     if (
       this.dashboard &&
@@ -31,7 +188,7 @@ class InputManager {
       this.dashboard.webContents &&
       !this.dashboard.webContents.isDestroyed()
     ) {
-      this.dashboard.webContents.send("input-event", payload);
+      this.dashboard.webContents.send("input-event", normalized);
     }
     if (
       this.projector &&
@@ -39,13 +196,13 @@ class InputManager {
       this.projector.webContents &&
       !this.projector.webContents.isDestroyed()
     ) {
-      this.projector.webContents.send("input-event", payload);
+      this.projector.webContents.send("input-event", normalized);
     }
   }
 
-  broadcastStatus(status, message = "") {
+  broadcastStatus(status: InputStatus, message = "") {
     this.connectionStatus = status;
-    const statusPayload = {
+    const statusPayload: InputStatusPayload = {
       type: "input-status",
       data: {
         status,
@@ -64,12 +221,12 @@ class InputManager {
     }
   }
 
-  async initialize(inputConfig) {
+  async initialize(inputConfig?: RuntimeInputConfig | null) {
     if (this.currentSource) {
       await this.disconnect();
     }
 
-    const config = inputConfig || DEFAULT_INPUT_CONFIG;
+    const config = (inputConfig || DEFAULT_INPUT_CONFIG) as RuntimeInputConfig;
 
     this.config = config;
 
@@ -79,29 +236,35 @@ class InputManager {
         `Connecting to ${config.type}...`
       );
 
-      switch (config.type) {
+      const inputType =
+        typeof (config as { type?: string }).type === "string"
+          ? (config as { type: string }).type
+          : "";
+
+      switch (inputType) {
         case "midi":
-          await this.initMIDI(config);
+          await this.initMIDI(config as RuntimeMidiConfig);
           break;
         case "osc":
-          await this.initOSC(config);
+          await this.initOSC(config as RuntimeOscConfig);
           break;
         default:
-          console.warn("[InputManager] Unknown input type:", config.type);
+          console.warn("[InputManager] Unknown input type:", inputType);
           this.broadcastStatus(
             INPUT_STATUS.ERROR,
-            `Unknown input type: ${config.type}`
+            `Unknown input type: ${inputType}`
           );
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error("[InputManager] Initialization failed:", error);
-      this.broadcastStatus(INPUT_STATUS.ERROR, error.message);
+      this.broadcastStatus(INPUT_STATUS.ERROR, message);
       throw error;
     }
   }
 
-  async initMIDI(midiConfig) {
-    return new Promise((resolve, reject) => {
+  async initMIDI(midiConfig: RuntimeMidiConfig) {
+    return new Promise<void>((resolve, reject) => {
       const setupMIDI = () => {
         try {
           const deviceId =
@@ -129,7 +292,7 @@ class InputManager {
             return reject(error);
           }
 
-          input.addListener("noteon", (e) => {
+          input.addListener("noteon", (e: NoteOnEvent) => {
             const note = e.note.number;
             const channel = e.message.channel;
             const velocity = midiConfig.velocitySensitive ? e.velocity : 127;
@@ -159,12 +322,11 @@ class InputManager {
           );
           resolve();
         } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
           console.error("[InputManager] Error in MIDI setup:", error);
           this.currentSource = null;
-          this.broadcastStatus(
-            INPUT_STATUS.ERROR,
-            `MIDI error: ${error.message}`
-          );
+          this.broadcastStatus(INPUT_STATUS.ERROR, `MIDI error: ${message}`);
           reject(error);
         }
       };
@@ -188,11 +350,11 @@ class InputManager {
     });
   }
 
-  async initOSC(oscConfig) {
+  async initOSC(oscConfig: RuntimeOscConfig) {
     const port = oscConfig.port || 8000;
 
     try {
-      const udpPort = new osc.UDPPort({
+      const udpPort = new UDPPort({
         localAddress: "0.0.0.0",
         localPort: port,
         metadata: true,
@@ -202,18 +364,16 @@ class InputManager {
         this.broadcastStatus(INPUT_STATUS.CONNECTED, `OSC: Port ${port}`);
       });
 
-      udpPort.on("message", (oscMsg) => {
+      udpPort.on("message", (oscMsg: OscMessage) => {
         const rawAddress = oscMsg.address;
         const address = rawAddress.replace(/\s+/g, "");
         const args = oscMsg.args || [];
-        const value = args[0]?.value;
+        const value = args[0] ? args[0].value : undefined;
 
-        // Filter out note-off messages (value = 0)
         if (value !== undefined && typeof value === "number" && value === 0) {
           return;
         }
 
-        // OSC Naming Convention (Industry Standard)
         if (isValidOSCTrackAddress(address)) {
           this.broadcast("track-selection", {
             identifier: address,
@@ -243,7 +403,7 @@ class InputManager {
         );
       });
 
-      udpPort.on("error", (err) => {
+      udpPort.on("error", (err: OscError) => {
         console.error("[InputManager] ❌ OSC error:", err);
         console.error("[InputManager] Error details:", {
           code: err.code,
@@ -258,11 +418,12 @@ class InputManager {
       this.currentSource = { type: "osc", instance: udpPort };
       console.log(`[InputManager] ✅ UDP port opened successfully`);
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error(`[InputManager] ❌ Failed to initialize OSC:`, err);
       this.currentSource = null;
       this.broadcastStatus(
         INPUT_STATUS.ERROR,
-        `Failed to start OSC: ${err.message}`
+        `Failed to start OSC: ${message}`
       );
     }
   }
@@ -306,7 +467,7 @@ class InputManager {
   }
 
   static getAvailableMIDIDevices() {
-    return new Promise((resolve) => {
+    return new Promise<MidiDeviceInfo[]>((resolve) => {
       WebMidi.enable((err) => {
         if (err) {
           console.error("[InputManager] Failed to enable WebMIDI:", err);
@@ -323,4 +484,4 @@ class InputManager {
   }
 }
 
-module.exports = InputManager;
+export default InputManager;
