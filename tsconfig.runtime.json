@@ -33,6 +33,8 @@
     "src/shared/utils/sdkHelpers.ts",
     "src/shared/utils/methodOptions.ts",
     "src/shared/utils/projectDir.ts",
+    "src/shared/midi/midiUtils.ts",
+    "src/shared/midi/midiPlayback.ts",
     "src/main/InputManager.ts"
   ]
 }

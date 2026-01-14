@@ -1,7 +1,17 @@
-// MIDI Playback Engine
-// Schedules and triggers MIDI notes for playback without Ableton
+type MidiSequence = { time: number };
+type MidiChannel = { name: unknown; midi: unknown; sequences: MidiSequence[] };
+type NoteCallback = (channelName: unknown, midi: unknown) => void;
 
 class MidiPlayback {
+  isPlaying: boolean;
+  startTime: number;
+  pausedTime: number;
+  scheduledEvents: Array<ReturnType<typeof setTimeout>>;
+  channels: MidiChannel[];
+  bpm: number;
+  onNoteCallback: NoteCallback | null;
+  onStopCallback: (() => void) | null;
+
   constructor() {
     this.isPlaying = false;
     this.startTime = 0;
@@ -13,18 +23,18 @@ class MidiPlayback {
     this.onStopCallback = null;
   }
 
-  load(channels, bpm = 120) {
-    this.channels = channels;
-    this.bpm = bpm;
+  load(channels: unknown, bpm: unknown = 120) {
+    this.channels = Array.isArray(channels) ? (channels as MidiChannel[]) : [];
+    this.bpm = typeof bpm === "number" && Number.isFinite(bpm) && bpm > 0 ? bpm : 120;
     this.reset();
   }
 
-  setOnNoteCallback(callback) {
-    this.onNoteCallback = callback;
+  setOnNoteCallback(callback: unknown) {
+    this.onNoteCallback = typeof callback === "function" ? (callback as NoteCallback) : null;
   }
 
-  setOnStopCallback(callback) {
-    this.onStopCallback = callback;
+  setOnStopCallback(callback: unknown) {
+    this.onStopCallback = typeof callback === "function" ? (callback as () => void) : null;
   }
 
   reset() {
@@ -128,3 +138,4 @@ class MidiPlayback {
 }
 
 export default MidiPlayback;
+

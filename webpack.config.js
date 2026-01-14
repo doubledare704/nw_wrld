@@ -32,6 +32,7 @@ module.exports = (env, argv) => {
           include: [
             path.resolve(__dirname, "src", "shared", "json"),
             path.resolve(__dirname, "src", "shared", "utils"),
+            path.resolve(__dirname, "src", "shared", "midi"),
           ],
           exclude: /node_modules/,
           use: {

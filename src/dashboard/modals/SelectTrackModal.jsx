@@ -8,17 +8,14 @@ import { ModalFooter } from "../components/ModalFooter.js";
 import { Button } from "../components/Button.js";
 import { RadioButton, Label } from "../components/FormInputs.js";
 import { updateActiveSet } from "../core/utils.js";
-import {
-  getActiveSetTracks,
-  getActiveSet,
-} from "../../shared/utils/setUtils.ts";
+import { getActiveSetTracks, getActiveSet } from "../../shared/utils/setUtils.ts";
 import { EditTrackModal } from "./EditTrackModal.jsx";
 import { deleteRecordingsForTracks } from "../../shared/json/recordingUtils.ts";
 import {
   parsePitchClass,
   pitchClassToName,
   resolveTrackTrigger,
-} from "../../shared/midi/midiUtils.js";
+} from "../../shared/midi/midiUtils.ts";
 
 const SortableTrackItem = ({
   track,
@@ -34,10 +31,7 @@ const SortableTrackItem = ({
     <SortableWrapper id={track.id}>
       {({ dragHandleProps, isDragging }) => (
         <div className="flex items-center gap-3 py-2">
-          <span
-            className="text-neutral-300 cursor-move text-md"
-            {...dragHandleProps}
-          >
+          <span className="text-neutral-300 cursor-move text-md" {...dragHandleProps}>
             {"\u2261"}
           </span>
           <RadioButton
@@ -49,17 +43,11 @@ const SortableTrackItem = ({
           <label
             htmlFor={`track-${track.id}`}
             className={`uppercase cursor-pointer text-[11px] font-mono flex-1 ${
-              activeTrackId === track.id
-                ? "text-neutral-300"
-                : "text-neutral-300/30"
+              activeTrackId === track.id ? "text-neutral-300" : "text-neutral-300/30"
             }`}
           >
             {(() => {
-              const rawTrigger = resolveTrackTrigger(
-                track,
-                inputType,
-                globalMappings
-              );
+              const rawTrigger = resolveTrackTrigger(track, inputType, globalMappings);
               const trigger =
                 inputType === "midi" &&
                 rawTrigger !== "" &&
@@ -70,12 +58,9 @@ const SortableTrackItem = ({
                         globalMappings?.input?.noteMatchMode === "exactNote"
                           ? "exactNote"
                           : "pitchClass";
-                      if (noteMatchMode === "exactNote")
-                        return String(rawTrigger);
+                      if (noteMatchMode === "exactNote") return String(rawTrigger);
                       const pc =
-                        typeof rawTrigger === "number"
-                          ? rawTrigger
-                          : parsePitchClass(rawTrigger);
+                        typeof rawTrigger === "number" ? rawTrigger : parsePitchClass(rawTrigger);
                       if (pc === null) return String(rawTrigger);
                       return pitchClassToName(pc) || String(pc);
                     })()
@@ -132,25 +117,22 @@ export const SelectTrackModal = ({
     const track = tracks[trackIndex];
     if (!track) return;
 
-    onConfirmDelete(
-      `Are you sure you want to delete track "${track.name}"?`,
-      () => {
-        updateActiveSet(setUserData, activeSetId, (activeSet) => {
-          activeSet.tracks.splice(trackIndex, 1);
-        });
+    onConfirmDelete(`Are you sure you want to delete track "${track.name}"?`, () => {
+      updateActiveSet(setUserData, activeSetId, (activeSet) => {
+        activeSet.tracks.splice(trackIndex, 1);
+      });
 
-        setRecordingData((prev) => deleteRecordingsForTracks(prev, [track.id]));
+      setRecordingData((prev) => deleteRecordingsForTracks(prev, [track.id]));
 
-        if (activeTrackId === track.id) {
-          const remainingTracks = tracks.filter((t, idx) => idx !== trackIndex);
-          if (remainingTracks.length > 0) {
-            setActiveTrackId(remainingTracks[0].id);
-          } else {
-            setActiveTrackId(null);
-          }
+      if (activeTrackId === track.id) {
+        const remainingTracks = tracks.filter((t, idx) => idx !== trackIndex);
+        if (remainingTracks.length > 0) {
+          setActiveTrackId(remainingTracks[0].id);
+        } else {
+          setActiveTrackId(null);
         }
       }
-    );
+    });
   };
 
   return (
@@ -170,11 +152,7 @@ export const SelectTrackModal = ({
                 items={tracks}
                 onReorder={(oldIndex, newIndex) => {
                   updateActiveSet(setUserData, activeSetId, (activeSet) => {
-                    activeSet.tracks = arrayMove(
-                      activeSet.tracks,
-                      oldIndex,
-                      newIndex
-                    );
+                    activeSet.tracks = arrayMove(activeSet.tracks, oldIndex, newIndex);
                   });
                 }}
               >

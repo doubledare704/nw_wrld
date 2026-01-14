@@ -24,7 +24,7 @@ import { useTrackSlots } from "../core/hooks/useTrackSlots.js";
 import {
   parsePitchClass,
   pitchClassToName,
-} from "../../shared/midi/midiUtils.js";
+} from "../../shared/midi/midiUtils.ts";
 
 export const CreateTrackModal = ({ isOpen, onClose, inputConfig, onAlert }) => {
   const [userData, setUserData] = useAtom(userDataAtom);

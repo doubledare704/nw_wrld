@@ -14,7 +14,7 @@ import {
   parsePitchClass,
   pitchClassToName,
   resolveChannelTrigger,
-} from "../../shared/midi/midiUtils.js";
+} from "../../shared/midi/midiUtils.ts";
 
 export const EditChannelModal = ({
   isOpen,

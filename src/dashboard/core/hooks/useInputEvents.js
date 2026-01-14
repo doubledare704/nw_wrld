@@ -4,12 +4,13 @@ import {
   setRecordingForTrack,
 } from "../../../shared/json/recordingUtils.ts";
 import {
+  buildMidiConfig,
   normalizeNoteMatchMode,
   noteNumberToTriggerKey,
   parseMidiTriggerValue,
   pitchClassToName,
   resolveChannelTrigger,
-} from "../../../shared/midi/midiUtils.js";
+} from "../../../shared/midi/midiUtils.ts";
 import { getActiveSetTracks } from "../../../shared/utils/setUtils.ts";
 import { useIPCListener } from "./useIPC.js";
 
@@ -36,7 +37,6 @@ export const useInputEvents = ({
     const tracks = getActiveSetTracks(userData, activeSetId);
     const globalMappings = userData?.config || {};
     const inputType = globalMappings.input?.type || "midi";
-    const { buildMidiConfig } = require("../../../shared/midi/midiUtils.js");
     triggerMapsRef.current = buildMidiConfig(tracks, globalMappings, inputType);
   }, [
     userData?.sets,

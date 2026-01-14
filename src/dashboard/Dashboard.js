@@ -20,7 +20,7 @@ import {
   saveAppState,
   saveAppStateSync,
 } from "../shared/json/appStateUtils.ts";
-import MidiPlayback from "../shared/midi/midiPlayback.js";
+import MidiPlayback from "../shared/midi/midiPlayback.ts";
 import SequencerPlayback from "../shared/sequencer/SequencerPlayback.js";
 import SequencerAudio from "../shared/audio/sequencerAudio.js";
 import { getActiveSetTracks } from "../shared/utils/setUtils.ts";

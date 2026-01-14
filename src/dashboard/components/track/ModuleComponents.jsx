@@ -29,7 +29,7 @@ import {
   resolveChannelTrigger,
   parsePitchClass,
   pitchClassToName,
-} from "../../../shared/midi/midiUtils.js";
+} from "../../../shared/midi/midiUtils.ts";
 import { Button } from "../Button.js";
 import { FaPlus } from "react-icons/fa";
 import { FaExclamationTriangle } from "react-icons/fa";

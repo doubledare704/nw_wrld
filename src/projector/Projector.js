@@ -16,7 +16,7 @@ import {
   normalizeNoteMatchMode,
   noteNumberToTriggerKey,
   pitchClassToName,
-} from "../shared/midi/midiUtils.js";
+} from "../shared/midi/midiUtils.ts";
 import { loadSettingsSync } from "../shared/json/configUtils.ts";
 import { getActiveSetTracks, migrateToSets } from "../shared/utils/setUtils.ts";
 import { buildMethodOptions } from "../shared/utils/methodOptions.ts";

@@ -18,7 +18,7 @@ import {
   getRecordingForTrack,
   setRecordingForTrack,
 } from "../../../shared/json/recordingUtils.ts";
-import MidiPlayback from "../../../shared/midi/midiPlayback.js";
+import MidiPlayback from "../../../shared/midi/midiPlayback.ts";
 import { Button } from "../Button.js";
 import { TrackDataModal } from "../../modals/TrackDataModal.jsx";
 import { ModuleSelector, SortableModuleItem } from "./ModuleComponents.jsx";

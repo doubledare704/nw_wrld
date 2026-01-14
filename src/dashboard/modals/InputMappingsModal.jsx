@@ -9,7 +9,7 @@ import { DEFAULT_GLOBAL_MAPPINGS } from "../../shared/config/defaultConfig.js";
 import {
   parsePitchClass,
   pitchClassToName,
-} from "../../shared/midi/midiUtils.js";
+} from "../../shared/midi/midiUtils.ts";
 
 export const InputMappingsModal = ({ isOpen, onClose }) => {
   const [userData, setUserData] = useAtom(userDataAtom);
