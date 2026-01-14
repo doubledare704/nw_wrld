@@ -33,6 +33,8 @@ module.exports = (env, argv) => {
             path.resolve(__dirname, "src", "shared", "json"),
             path.resolve(__dirname, "src", "shared", "utils"),
             path.resolve(__dirname, "src", "shared", "midi"),
+            path.resolve(__dirname, "src", "shared", "config"),
+            path.resolve(__dirname, "src", "shared", "nwWrldDocblock.ts"),
           ],
           exclude: /node_modules/,
           use: {

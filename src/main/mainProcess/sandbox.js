@@ -2,8 +2,21 @@ const { BrowserView, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
-const { state, srcDir } = require("./state");
-const { isExistingDirectory, resolveWithinDir } = require("./pathSafety");
+const runtimeMainProcessDir = path.join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "dist",
+  "runtime",
+  "main",
+  "mainProcess"
+);
+
+const { state, srcDir } = require(path.join(runtimeMainProcessDir, "state.js"));
+const { isExistingDirectory, resolveWithinDir } = require(
+  path.join(runtimeMainProcessDir, "pathSafety.js")
+);
 
 const {
   normalizeSandboxResult,

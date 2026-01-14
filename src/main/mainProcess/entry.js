@@ -1,13 +1,26 @@
 const { app, ipcMain } = require("electron");
+const path = require("path");
 
-const { state } = require("./state");
-const { setupApp } = require("./appSetup");
+const runtimeMainProcessDir = path.join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "dist",
+  "runtime",
+  "main",
+  "mainProcess"
+);
+
+const { state } = require(path.join(runtimeMainProcessDir, "state.js"));
+const { setupApp } = require(path.join(runtimeMainProcessDir, "appSetup.js"));
+const { registerProtocols } = require(path.join(runtimeMainProcessDir, "protocols.js"));
+const { registerWorkspaceSelectionIpc } = require(path.join(runtimeMainProcessDir, "workspace.js"));
+const { registerLifecycle, registerActivate } = require(path.join(runtimeMainProcessDir, "lifecycle.js"));
+
 const { registerIpcBridge } = require("./ipcBridge");
 const { registerSandboxIpc } = require("./sandbox");
-const { registerProtocols } = require("./protocols");
 const { createWindow, registerMessagingIpc } = require("./windows");
-const { registerWorkspaceSelectionIpc } = require("./workspace");
-const { registerLifecycle, registerActivate } = require("./lifecycle");
 
 function start() {
   setupApp();

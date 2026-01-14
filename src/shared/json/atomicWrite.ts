@@ -1,12 +1,12 @@
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as crypto from "node:crypto";
 
-const writeQueue = new Map();
-const writeEpoch = new Map();
+const writeQueue = new Map<string, Promise<void>>();
+const writeEpoch = new Map<string, number>();
 let tmpCounter = 0;
 
-function makeTempPath(filePath) {
+function makeTempPath(filePath: string) {
   tmpCounter = (tmpCounter + 1) >>> 0;
   const uuid =
     typeof crypto.randomUUID === "function"
@@ -15,7 +15,7 @@ function makeTempPath(filePath) {
   return `${filePath}.tmp.${process.pid}.${Date.now()}.${tmpCounter}.${uuid}`;
 }
 
-async function performAtomicWrite(filePath, data, epoch) {
+async function performAtomicWrite(filePath: string, data: string, epoch: number | null) {
   const tempPath = makeTempPath(filePath);
 
   try {
@@ -31,7 +31,8 @@ async function performAtomicWrite(filePath, data, epoch) {
     try {
       await fs.promises.rename(tempPath, filePath);
     } catch (renameError) {
-      if (renameError.code === "EEXIST" || renameError.code === "EPERM") {
+      const err = renameError as { code?: string };
+      if (err.code === "EEXIST" || err.code === "EPERM") {
         if (epoch != null && writeEpoch.get(filePath) !== epoch) {
           try {
             await fs.promises.unlink(tempPath);
@@ -46,7 +47,8 @@ async function performAtomicWrite(filePath, data, epoch) {
         try {
           await fs.promises.rename(filePath, backupPath);
         } catch (backupError) {
-          if (backupError.code !== "ENOENT") {
+          const bErr = backupError as { code?: string };
+          if (bErr.code !== "ENOENT") {
             throw backupError;
           }
         }
@@ -77,7 +79,7 @@ async function performAtomicWrite(filePath, data, epoch) {
   }
 }
 
-async function atomicWriteFile(filePath, data) {
+export async function atomicWriteFile(filePath: string, data: string) {
   const inflight = writeQueue.get(filePath);
   if (inflight) {
     try {
@@ -101,7 +103,7 @@ async function atomicWriteFile(filePath, data) {
   }
 }
 
-function atomicWriteFileSync(filePath, data) {
+export function atomicWriteFileSync(filePath: string, data: string) {
   const epoch = (writeEpoch.get(filePath) || 0) + 1;
   writeEpoch.set(filePath, epoch);
 
@@ -120,7 +122,8 @@ function atomicWriteFileSync(filePath, data) {
     try {
       fs.renameSync(tempPath, filePath);
     } catch (renameError) {
-      if (renameError.code === "EEXIST" || renameError.code === "EPERM") {
+      const err = renameError as { code?: string };
+      if (err.code === "EEXIST" || err.code === "EPERM") {
         if (epoch != null && writeEpoch.get(filePath) !== epoch) {
           try {
             fs.unlinkSync(tempPath);
@@ -135,7 +138,8 @@ function atomicWriteFileSync(filePath, data) {
         try {
           fs.renameSync(filePath, backupPath);
         } catch (backupError) {
-          if (backupError.code !== "ENOENT") {
+          const bErr = backupError as { code?: string };
+          if (bErr.code !== "ENOENT") {
             throw backupError;
           }
         }
@@ -166,11 +170,11 @@ function atomicWriteFileSync(filePath, data) {
   }
 }
 
-async function cleanupStaleTempFiles(directory, minAgeMs = 60_000) {
+export async function cleanupStaleTempFiles(directory: string, minAgeMs = 60_000) {
   try {
     const files = await fs.promises.readdir(directory);
     const now = Date.now();
-    const tempFiles = files.filter((f) => f.includes(".tmp."));
+    const tempFiles = files.filter((f: string) => f.includes(".tmp."));
 
     for (const file of tempFiles) {
       try {
@@ -183,9 +187,3 @@ async function cleanupStaleTempFiles(directory, minAgeMs = 60_000) {
     }
   } catch {}
 }
-
-module.exports = {
-  atomicWriteFile,
-  atomicWriteFileSync,
-  cleanupStaleTempFiles,
-};

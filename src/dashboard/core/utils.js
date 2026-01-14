@@ -3,7 +3,7 @@ import { migrateToSets, getActiveSet } from "../../shared/utils/setUtils.ts";
 import {
   DEFAULT_GLOBAL_MAPPINGS,
   DEFAULT_INPUT_CONFIG,
-} from "../../shared/config/defaultConfig.js";
+} from "../../shared/config/defaultConfig.ts";
 import {
   getJsonFilePath,
   loadJsonFile,

@@ -1,17 +1,33 @@
-const { app, protocol, nativeImage } = require("electron");
-const path = require("path");
-const fs = require("fs");
+import * as path from "node:path";
 
-const { state, srcDir } = require("./state");
-const { isExistingDirectory, resolveWithinDir } = require("./pathSafety");
+import { state, srcDir } from "./state";
+import { isExistingDirectory, resolveWithinDir } from "./pathSafety";
 
-function registerProtocols() {
+type ElectronApp = { isPackaged: boolean; dock: { setIcon(icon: unknown): void } };
+type ElectronProtocol = {
+  registerFileProtocol(
+    scheme: string,
+    handler: (
+      request: { url: string },
+      callback: (response: { path?: string; error?: number }) => void
+    ) => void
+  ): void;
+};
+type ElectronNativeImage = { createFromPath(p: string): { isEmpty(): boolean } };
+
+const { app, protocol, nativeImage } = require("electron") as {
+  app: ElectronApp;
+  protocol: ElectronProtocol;
+  nativeImage: ElectronNativeImage;
+};
+
+export function registerProtocols() {
   try {
     protocol.registerFileProtocol("nw-sandbox", (request, callback) => {
       try {
         const u = new URL(request.url);
         const pathname = u.pathname || "/";
-        const allowed = new Map([
+        const allowed = new Map<string, string>([
           [
             "/moduleSandbox.html",
             app.isPackaged
@@ -19,10 +35,7 @@ function registerProtocols() {
               : path.join(srcDir, "projector", "views", "moduleSandbox.html"),
           ],
           ["/moduleSandbox.js", path.join(srcDir, "..", "dist", "moduleSandbox.js")],
-          [
-            "/moduleSandbox.js.map",
-            path.join(srcDir, "..", "dist", "moduleSandbox.js.map"),
-          ],
+          ["/moduleSandbox.js.map", path.join(srcDir, "..", "dist", "moduleSandbox.js.map")],
         ]);
 
         const filePath = allowed.get(pathname);
@@ -59,7 +72,7 @@ function registerProtocols() {
         }
 
         const entry = state.sandboxTokenToProjectDir.get(token) || null;
-        const projectDir = entry?.projectDir || null;
+        const projectDir = entry && typeof entry.projectDir === "string" ? entry.projectDir : null;
         if (!projectDir || !isExistingDirectory(projectDir)) {
           return callback({ error: -6 });
         }
@@ -84,10 +97,11 @@ function registerProtocols() {
         app.dock.setIcon(icon);
       }
     } catch (err) {
-      console.error("[Main] Failed to set dock icon:", err?.message || err);
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? (err as { message?: unknown }).message
+          : err;
+      console.error("[Main] Failed to set dock icon:", message || err);
     }
   }
 }
-
-module.exports = { registerProtocols };
-

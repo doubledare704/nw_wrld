@@ -2,9 +2,25 @@ const { app, BrowserWindow, screen } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
-const { state, srcDir } = require("./state");
-const { isExistingDirectory, safeModuleName, resolveWithinDir } = require("./pathSafety");
-const { startWorkspaceWatcher, getProjectJsonDirForMain } = require("./workspace");
+const runtimeMainProcessDir = path.join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "dist",
+  "runtime",
+  "main",
+  "mainProcess"
+);
+const runtimeSharedDir = path.join(__dirname, "..", "..", "..", "dist", "runtime", "shared");
+
+const { state, srcDir } = require(path.join(runtimeMainProcessDir, "state.js"));
+const { isExistingDirectory, safeModuleName, resolveWithinDir } = require(
+  path.join(runtimeMainProcessDir, "pathSafety.js")
+);
+const { startWorkspaceWatcher, getProjectJsonDirForMain } = require(
+  path.join(runtimeMainProcessDir, "workspace.js")
+);
 const { updateSandboxViewBounds, destroySandboxView } = require("./sandbox");
 
 const InputManagerModule = require(path.join(
@@ -17,7 +33,7 @@ const InputManagerModule = require(path.join(
 ));
 const InputManager = InputManagerModule?.default || InputManagerModule;
 
-const { DEFAULT_USER_DATA } = require(path.join(srcDir, "shared", "config", "defaultConfig"));
+const { DEFAULT_USER_DATA } = require(path.join(runtimeSharedDir, "config", "defaultConfig.js"));
 
 const { sanitizeJsonForBridge } = require(path.join(
   srcDir,
@@ -320,7 +336,9 @@ function createWindow(projectDir) {
   state.dashboardWindow.webContents.once("did-finish-load", () => {
     const fullConfig = loadConfig(projectDir);
     state.inputManager = new InputManager(state.dashboardWindow, state.projector1Window);
-    const { DEFAULT_INPUT_CONFIG } = require(path.join(srcDir, "shared", "config", "defaultConfig"));
+    const { DEFAULT_INPUT_CONFIG } = require(
+      path.join(runtimeSharedDir, "config", "defaultConfig.js")
+    );
     const inputConfig = fullConfig.config?.input || DEFAULT_INPUT_CONFIG;
     if (fullConfig.config?.sequencerMode !== true) {
       state.inputManager.initialize(inputConfig).catch((err) => {

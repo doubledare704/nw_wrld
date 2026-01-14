@@ -9,14 +9,9 @@ import { PLYLoader } from "three/addons/loaders/PLYLoader.js";
 import { PCDLoader } from "three/addons/loaders/PCDLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
-import docblock from "../shared/nwWrldDocblock.js";
-import {
-  buildMethodOptions,
-  parseMatrixOptions,
-} from "../shared/utils/methodOptions.ts";
+import { parseNwWrldDocblockMetadata } from "../shared/nwWrldDocblock.ts";
+import { buildMethodOptions, parseMatrixOptions } from "../shared/utils/methodOptions.ts";
 import { createSdkHelpers } from "../shared/utils/sdkHelpers.ts";
-
-const { parseNwWrldDocblockMetadata } = docblock || {};
 
 if (!globalThis.THREE) globalThis.THREE = THREE;
 if (!globalThis.p5) globalThis.p5 = p5;
@@ -40,8 +35,7 @@ const getTokenFromLocation = () => {
   }
 };
 
-const TOKEN =
-  getTokenFromLocation() || globalThis.__NW_WRLD_SANDBOX_TOKEN__ || null;
+const TOKEN = getTokenFromLocation() || globalThis.__NW_WRLD_SANDBOX_TOKEN__ || null;
 
 const WORKSPACE_MODULE_ALLOWED_IMPORTS = new Set([
   "ModuleBase",
@@ -85,9 +79,7 @@ const ensureTrailingSlash = (url) => {
 const buildWorkspaceImportPreamble = (moduleId, importsList) => {
   const requested = Array.isArray(importsList) ? importsList : [];
   if (!requested.length) {
-    throw new Error(
-      `[Sandbox] Workspace module "${moduleId}" missing required @nwWrld imports.`
-    );
+    throw new Error(`[Sandbox] Workspace module "${moduleId}" missing required @nwWrld imports.`);
   }
   for (const token of requested) {
     if (!WORKSPACE_MODULE_ALLOWED_IMPORTS.has(token)) {
@@ -110,17 +102,13 @@ const buildWorkspaceImportPreamble = (moduleId, importsList) => {
 
   const lines = [];
   if (sdkImports.length) {
-    lines.push(
-      `const { ${sdkImports.join(", ")} } = globalThis.nwWrldSdk || {};`
-    );
+    lines.push(`const { ${sdkImports.join(", ")} } = globalThis.nwWrldSdk || {};`);
   }
   for (const g of globalImports) {
     lines.push(`const ${g} = globalThis.${g};`);
   }
   for (const token of requested) {
-    lines.push(
-      `if (!${token}) { throw new Error("Missing required import: ${token}"); }`
-    );
+    lines.push(`if (!${token}) { throw new Error("Missing required import: ${token}"); }`);
   }
   return `${lines.join("\n")}\n`;
 };
@@ -236,9 +224,7 @@ const createSdk = () => {
     try {
       const res = await rpcRequest("sdk:listAssets", { relDir: safe });
       const entries = Array.isArray(res?.entries) ? res.entries : [];
-      return entries.filter(
-        (e) => typeof e === "string" && e.trim().length > 0
-      );
+      return entries.filter((e) => typeof e === "string" && e.trim().length > 0);
     } catch {
       return [];
     }
@@ -266,8 +252,7 @@ const mergeMethodsByName = (baseMethods, declaredMethods) => {
 
 const getBaseMethodsForClass = (Cls) => {
   try {
-    if (Cls?.prototype instanceof BaseThreeJsModule)
-      return BaseThreeJsModule.methods;
+    if (Cls?.prototype instanceof BaseThreeJsModule) return BaseThreeJsModule.methods;
     if (Cls?.prototype instanceof ModuleBase) return ModuleBase.methods;
   } catch {}
   return [];
@@ -283,8 +268,7 @@ const ensureRoot = () => {
   document.body.style.height = "100%";
   const el = document.createElement("div");
   el.id = "nwWrldTrackRoot";
-  el.style.cssText =
-    "position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;";
+  el.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;";
   document.body.appendChild(el);
   trackRoot = el;
   return trackRoot;
@@ -304,9 +288,7 @@ const loadModuleClassFromSource = async (moduleType, sourceText) => {
     const imported = await import(/* webpackIgnore: true */ blobUrl);
     const Cls = imported?.default || null;
     if (!Cls) {
-      throw new Error(
-        `[Sandbox] Module "${moduleType}" did not export default.`
-      );
+      throw new Error(`[Sandbox] Module "${moduleType}" did not export default.`);
     }
     return Cls;
   } finally {
@@ -340,8 +322,7 @@ const destroyTrack = () => {
   instancesById.clear();
   moduleClassCache.clear();
   try {
-    if (trackRoot && trackRoot.parentNode)
-      trackRoot.parentNode.removeChild(trackRoot);
+    if (trackRoot && trackRoot.parentNode) trackRoot.parentNode.removeChild(trackRoot);
   } catch {}
   trackRoot = null;
 };
@@ -422,13 +403,10 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
         const moduleType = String(m?.type || "").trim();
         if (!instanceId || !moduleType) continue;
 
-        const constructorMethods = Array.isArray(
-          modulesData?.[instanceId]?.constructor
-        )
+        const constructorMethods = Array.isArray(modulesData?.[instanceId]?.constructor)
           ? modulesData[instanceId].constructor
           : [];
-        const matrixMethod =
-          constructorMethods.find((mm) => mm?.name === "matrix") || null;
+        const matrixMethod = constructorMethods.find((mm) => mm?.name === "matrix") || null;
         const matrix = parseMatrixOptions(matrixMethod?.options);
 
         const zIndex = getInstanceIndex(trackModules, instanceId) + 1;
@@ -467,9 +445,7 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
 
         instancesById.set(instanceId, { moduleType, instances });
 
-        const nonMatrix = constructorMethods.filter(
-          (mm) => mm?.name && mm.name !== "matrix"
-        );
+        const nonMatrix = constructorMethods.filter((mm) => mm?.name && mm.name !== "matrix");
         for (const mm of nonMatrix) {
           const methodName = String(mm.name || "").trim();
           if (!methodName) continue;
@@ -520,8 +496,7 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
         respond({ ok: false, error: "INVALID_INSTANCE_ID" });
         return;
       }
-      const moduleEntry =
-        trackModules.find((m) => m && m.id === instanceId) || null;
+      const moduleEntry = trackModules.find((m) => m && m.id === instanceId) || null;
       const moduleType = String(moduleEntry?.type || "").trim();
       if (!moduleType) {
         respond({ ok: false, error: "INSTANCE_NOT_IN_TRACK" });
@@ -591,15 +566,10 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
     if (type === "introspectModule") {
       const moduleType = String(props.moduleType || "").trim();
       const sourceText = String(props.sourceText || "");
-      const ModuleClass = await loadModuleClassFromSource(
-        moduleType,
-        sourceText
-      );
+      const ModuleClass = await loadModuleClassFromSource(moduleType, sourceText);
       const callable = getCallableMethodNamesFromClass(ModuleClass);
       const baseMethods = getBaseMethodsForClass(ModuleClass);
-      const declaredMethods = Array.isArray(ModuleClass?.methods)
-        ? ModuleClass.methods
-        : [];
+      const declaredMethods = Array.isArray(ModuleClass?.methods) ? ModuleClass.methods : [];
       const methods = mergeMethodsByName(baseMethods, declaredMethods);
       respond({
         ok: true,

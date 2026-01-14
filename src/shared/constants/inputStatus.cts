@@ -3,6 +3,7 @@ const INPUT_STATUS = {
   CONNECTING: "connecting",
   CONNECTED: "connected",
   ERROR: "error",
-};
+} as const;
 
-module.exports = INPUT_STATUS;
+export = INPUT_STATUS;
+

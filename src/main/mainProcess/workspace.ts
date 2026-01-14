@@ -1,22 +1,45 @@
-const { ipcMain, dialog } = require("electron");
-const path = require("path");
-const fs = require("fs");
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-const { state, srcDir } = require("./state");
-const { isExistingDirectory } = require("./pathSafety");
+import { state, srcDir } from "./state";
+import { isExistingDirectory } from "./pathSafety";
 
-const { ensureWorkspaceStarterModules } = require(
-  path.join(srcDir, "main", "workspaceStarterModules")
-);
-const { ensureWorkspaceStarterAssets } = require(
-  path.join(srcDir, "main", "workspaceStarterAssets")
-);
+type ElectronIpcMain = {
+  handle(
+    channel: string,
+    handler: (...args: unknown[]) => unknown | Promise<unknown>
+  ): void;
+};
 
-const getLegacyJsonDirForMain = () => path.join(srcDir, "..", "src", "shared", "json");
+type ElectronDialog = {
+  showOpenDialog(options: {
+    properties: string[];
+  }): Promise<{ canceled: boolean; filePaths: string[] }>;
+};
+
+const { ipcMain, dialog } = require("electron") as {
+  ipcMain: ElectronIpcMain;
+  dialog: ElectronDialog;
+};
+
+const { ensureWorkspaceStarterModules } = require(path.join(
+  srcDir,
+  "main",
+  "workspaceStarterModules"
+)) as { ensureWorkspaceStarterModules: (modulesDir: string) => void };
+
+const { ensureWorkspaceStarterAssets } = require(path.join(
+  srcDir,
+  "main",
+  "workspaceStarterAssets"
+)) as { ensureWorkspaceStarterAssets: (workspacePath: string) => void };
+
+const getLegacyJsonDirForMain = () =>
+  path.join(srcDir, "..", "src", "shared", "json");
 
 const getFallbackJsonDirForMain = () => path.join(srcDir, "shared", "json");
 
-const getProjectJsonDirForMain = (projectDir) => {
+export const getProjectJsonDirForMain = (projectDir: string | null) => {
   if (!projectDir || typeof projectDir !== "string") return null;
   if (!isExistingDirectory(projectDir)) return null;
   const dir = path.join(projectDir, "nw_wrld_data", "json");
@@ -26,9 +49,9 @@ const getProjectJsonDirForMain = (projectDir) => {
   return dir;
 };
 
-const getJsonStatusForProject = (projectDir) => {
+export const getJsonStatusForProject = (projectDir: string | null) => {
   if (!projectDir) {
-    return { ok: false, reason: "NO_PROJECT_SELECTED", projectDir: null };
+    return { ok: false, reason: "NO_PROJECT_SELECTED", projectDir: null as null };
   }
   if (!isExistingDirectory(projectDir)) {
     return { ok: false, reason: "PROJECT_DIR_MISSING", projectDir };
@@ -36,7 +59,7 @@ const getJsonStatusForProject = (projectDir) => {
   return { ok: true, projectDir };
 };
 
-const getJsonDirForBridge = (projectDir) => {
+export const getJsonDirForBridge = (projectDir: string | null) => {
   const status = getJsonStatusForProject(projectDir);
   if (!status.ok) {
     return getFallbackJsonDirForMain();
@@ -44,7 +67,10 @@ const getJsonDirForBridge = (projectDir) => {
   return getProjectJsonDirForMain(projectDir) || getFallbackJsonDirForMain();
 };
 
-const maybeMigrateLegacyJsonFileForBridge = (projectDir, filename) => {
+export const maybeMigrateLegacyJsonFileForBridge = (
+  projectDir: string | null,
+  filename: string
+) => {
   const destDir = getProjectJsonDirForMain(projectDir);
   if (!destDir) return;
   const legacyDir = getFallbackJsonDirForMain();
@@ -63,48 +89,51 @@ const maybeMigrateLegacyJsonFileForBridge = (projectDir, filename) => {
   } catch {}
 };
 
-const maybeMigrateJsonIntoProject = (projectDir) => {
+export const maybeMigrateJsonIntoProject = (projectDir: string | null) => {
   if (!projectDir || typeof projectDir !== "string") return;
   const destDir = getProjectJsonDirForMain(projectDir);
   if (!destDir) return;
   const legacyDir = getLegacyJsonDirForMain();
 
-  ["userData.json", "appState.json", "config.json", "recordingData.json"].forEach((filename) => {
-    const destPath = path.join(destDir, filename);
-    if (fs.existsSync(destPath)) return;
+  ["userData.json", "appState.json", "config.json", "recordingData.json"].forEach(
+    (filename) => {
+      const destPath = path.join(destDir, filename);
+      if (fs.existsSync(destPath)) return;
 
-    const srcCandidates = [path.join(legacyDir, filename)];
-    const srcPath = srcCandidates.find((p) => {
+      const srcCandidates = [path.join(legacyDir, filename)];
+      const srcPath = srcCandidates.find((p) => {
+        try {
+          return fs.existsSync(p);
+        } catch {
+          return false;
+        }
+      });
+      if (!srcPath) return;
+
       try {
-        return fs.existsSync(p);
-      } catch {
-        return false;
-      }
-    });
-    if (!srcPath) return;
+        fs.copyFileSync(srcPath, destPath);
+      } catch {}
 
-    try {
-      fs.copyFileSync(srcPath, destPath);
-    } catch {}
-
-    const srcBackupPath = `${srcPath}.backup`;
-    const destBackupPath = `${destPath}.backup`;
-    try {
-      if (!fs.existsSync(destBackupPath) && fs.existsSync(srcBackupPath)) {
-        fs.copyFileSync(srcBackupPath, destBackupPath);
-      }
-    } catch {}
-  });
+      const srcBackupPath = `${srcPath}.backup`;
+      const destBackupPath = `${destPath}.backup`;
+      try {
+        if (!fs.existsSync(destBackupPath) && fs.existsSync(srcBackupPath)) {
+          fs.copyFileSync(srcBackupPath, destBackupPath);
+        }
+      } catch {}
+    }
+  );
 };
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-const waitForWorkspaceSettle = async (modulesDir, filename) => {
+const waitForWorkspaceSettle = async (modulesDir: string, filename: string | null) => {
   const maxAttempts = 6;
   const intervalMs = 120;
-  const target = filename && typeof filename === "string" ? path.join(modulesDir, filename) : null;
+  const target =
+    filename && typeof filename === "string" ? path.join(modulesDir, filename) : null;
 
-  let prevSig = null;
+  let prevSig: string | null = null;
   for (let i = 0; i < maxAttempts; i++) {
     try {
       if (target) {
@@ -114,9 +143,9 @@ const waitForWorkspaceSettle = async (modulesDir, filename) => {
         prevSig = sig;
       } else {
         const entries = await fs.promises.readdir(modulesDir);
-        const jsFiles = entries.filter((f) => f.endsWith(".js"));
+        const jsFiles = entries.filter((f: string) => f.endsWith(".js"));
         const stats = await Promise.all(
-          jsFiles.map(async (f) => {
+          jsFiles.map(async (f: string) => {
             try {
               const s = await fs.promises.stat(path.join(modulesDir, f));
               return `${f}:${s.size}:${s.mtimeMs}`;
@@ -137,45 +166,72 @@ const waitForWorkspaceSettle = async (modulesDir, filename) => {
 };
 
 const broadcastWorkspaceModulesChanged = () => {
+  const dash = state.dashboardWindow as
+    | {
+        isDestroyed(): boolean;
+        webContents?: { isDestroyed(): boolean; send(ch: string, payload: unknown): void };
+      }
+    | null;
   if (
-    state.dashboardWindow &&
-    !state.dashboardWindow.isDestroyed() &&
-    state.dashboardWindow.webContents &&
-    !state.dashboardWindow.webContents.isDestroyed()
+    dash &&
+    !dash.isDestroyed() &&
+    dash.webContents &&
+    !dash.webContents.isDestroyed()
   ) {
-    state.dashboardWindow.webContents.send("workspace:modulesChanged", {});
+    dash.webContents.send("workspace:modulesChanged", {});
   }
+
+  const proj = state.projector1Window as
+    | {
+        isDestroyed(): boolean;
+        webContents?: { isDestroyed(): boolean; send(ch: string, payload: unknown): void };
+      }
+    | null;
   if (
-    state.projector1Window &&
-    !state.projector1Window.isDestroyed() &&
-    state.projector1Window.webContents &&
-    !state.projector1Window.webContents.isDestroyed()
+    proj &&
+    !proj.isDestroyed() &&
+    proj.webContents &&
+    !proj.webContents.isDestroyed()
   ) {
-    state.projector1Window.webContents.send("workspace:modulesChanged", {});
+    proj.webContents.send("workspace:modulesChanged", {});
   }
 };
 
-const broadcastWorkspaceLostSync = (workspacePath) => {
+const broadcastWorkspaceLostSync = (workspacePath: string | null) => {
   const payload = { workspacePath: workspacePath || null };
+
+  const dash = state.dashboardWindow as
+    | {
+        isDestroyed(): boolean;
+        webContents?: { isDestroyed(): boolean; send(ch: string, payload: unknown): void };
+      }
+    | null;
   if (
-    state.dashboardWindow &&
-    !state.dashboardWindow.isDestroyed() &&
-    state.dashboardWindow.webContents &&
-    !state.dashboardWindow.webContents.isDestroyed()
+    dash &&
+    !dash.isDestroyed() &&
+    dash.webContents &&
+    !dash.webContents.isDestroyed()
   ) {
-    state.dashboardWindow.webContents.send("workspace:lostSync", payload);
+    dash.webContents.send("workspace:lostSync", payload);
   }
+
+  const proj = state.projector1Window as
+    | {
+        isDestroyed(): boolean;
+        webContents?: { isDestroyed(): boolean; send(ch: string, payload: unknown): void };
+      }
+    | null;
   if (
-    state.projector1Window &&
-    !state.projector1Window.isDestroyed() &&
-    state.projector1Window.webContents &&
-    !state.projector1Window.webContents.isDestroyed()
+    proj &&
+    !proj.isDestroyed() &&
+    proj.webContents &&
+    !proj.webContents.isDestroyed()
   ) {
-    state.projector1Window.webContents.send("workspace:lostSync", payload);
+    proj.webContents.send("workspace:lostSync", payload);
   }
 };
 
-const startWorkspaceWatcher = (workspacePath) => {
+export const startWorkspaceWatcher = (workspacePath: string | null) => {
   if (!workspacePath || typeof workspacePath !== "string") {
     state.currentWorkspacePath = null;
     if (state.workspaceWatcher) {
@@ -236,7 +292,7 @@ const startWorkspaceWatcher = (workspacePath) => {
   } catch {}
 
   try {
-    state.workspaceWatcher = fs.watch(modulesDir, (eventType, filename) => {
+    state.workspaceWatcher = fs.watch(modulesDir, (eventType: string, filename: string | null) => {
       if (filename && !String(filename).endsWith(".js")) return;
       if (state.workspaceWatcherDebounce) {
         clearTimeout(state.workspaceWatcherDebounce);
@@ -244,14 +300,14 @@ const startWorkspaceWatcher = (workspacePath) => {
       state.workspaceWatcherDebounce = setTimeout(async () => {
         state.workspaceWatcherDebounce = null;
         try {
-          await waitForWorkspaceSettle(modulesDir, filename);
+          await waitForWorkspaceSettle(modulesDir, filename ? String(filename) : null);
         } catch {}
         broadcastWorkspaceModulesChanged();
       }, 350);
     });
     state.workspaceWatcher.on("error", () => {
       try {
-        state.workspaceWatcher.close();
+        state.workspaceWatcher?.close();
       } catch {}
       state.workspaceWatcher = null;
       broadcastWorkspaceLostSync(workspacePath);
@@ -261,7 +317,7 @@ const startWorkspaceWatcher = (workspacePath) => {
   }
 };
 
-const ensureWorkspaceScaffold = async (workspacePath) => {
+export const ensureWorkspaceScaffold = async (workspacePath: string | null) => {
   if (!workspacePath || typeof workspacePath !== "string") return;
 
   try {
@@ -289,12 +345,9 @@ const ensureWorkspaceScaffold = async (workspacePath) => {
     try {
       fs.writeFileSync(
         readmePath,
-        [
-          "# nw_wrld Modules Workspace",
-          "",
-          "Edit files in `modules/` and nw_wrld will reload them automatically.",
-          "",
-        ].join("\n"),
+        ["# nw_wrld Modules Workspace", "", "Edit files in `modules/` and nw_wrld will reload them automatically.", "",].join(
+          "\n"
+        ),
         "utf-8"
       );
     } catch {}
@@ -315,7 +368,11 @@ const ensureWorkspaceScaffold = async (workspacePath) => {
   } catch {}
 };
 
-function registerWorkspaceSelectionIpc({ createWindow }) {
+export function registerWorkspaceSelectionIpc({
+  createWindow,
+}: {
+  createWindow: (projectDir: string | null) => void;
+}) {
   ipcMain.handle("workspace:select", async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory", "createDirectory"],
@@ -330,23 +387,27 @@ function registerWorkspaceSelectionIpc({ createWindow }) {
 
     if (state.inputManager) {
       try {
-        await state.inputManager.disconnect();
+        await (state.inputManager as { disconnect?: () => Promise<void> }).disconnect?.();
       } catch {}
       state.inputManager = null;
     }
 
-    const closeWindow = (win) =>
-      new Promise((resolve) => {
-        if (!win || win.isDestroyed()) return resolve();
-        win.once("closed", () => resolve());
+    const closeWindow = (win: unknown) =>
+      new Promise<void>((resolve) => {
+        const w = win as { isDestroyed?: () => boolean; once?: (e: string, cb: () => void) => void; close?: () => void };
+        if (!w || w.isDestroyed?.()) return resolve();
+        w.once?.("closed", () => resolve());
         try {
-          win.close();
+          w.close?.();
         } catch {
           resolve();
         }
       });
 
-    await Promise.all([closeWindow(state.dashboardWindow), closeWindow(state.projector1Window)]);
+    await Promise.all([
+      closeWindow(state.dashboardWindow),
+      closeWindow(state.projector1Window),
+    ]);
     state.dashboardWindow = null;
     state.projector1Window = null;
 
@@ -355,13 +416,3 @@ function registerWorkspaceSelectionIpc({ createWindow }) {
   });
 }
 
-module.exports = {
-  getProjectJsonDirForMain,
-  getJsonStatusForProject,
-  getJsonDirForBridge,
-  maybeMigrateLegacyJsonFileForBridge,
-  maybeMigrateJsonIntoProject,
-  startWorkspaceWatcher,
-  ensureWorkspaceScaffold,
-  registerWorkspaceSelectionIpc,
-};

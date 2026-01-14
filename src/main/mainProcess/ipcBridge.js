@@ -5,24 +5,32 @@ const { pathToFileURL } = require("url");
 
 const { app } = require("electron");
 
-const { state, srcDir } = require("./state");
-const {
-  isExistingDirectory,
-  resolveWithinDir,
-  safeModuleName,
-  safeJsonFilename,
-} = require("./pathSafety");
-const {
-  getJsonStatusForProject,
-  getJsonDirForBridge,
-  maybeMigrateLegacyJsonFileForBridge,
-} = require("./workspace");
-
-const { atomicWriteFile, atomicWriteFileSync } = require(
-  path.join(srcDir, "shared", "json", "atomicWrite.cjs")
+const runtimeMainProcessDir = path.join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "dist",
+  "runtime",
+  "main",
+  "mainProcess"
 );
 
-const { parseNwWrldDocblockMetadata } = require(path.join(srcDir, "shared", "nwWrldDocblock"));
+const { state, srcDir } = require(path.join(runtimeMainProcessDir, "state.js"));
+const { isExistingDirectory, resolveWithinDir, safeModuleName, safeJsonFilename } = require(
+  path.join(runtimeMainProcessDir, "pathSafety.js")
+);
+const { getJsonStatusForProject, getJsonDirForBridge, maybeMigrateLegacyJsonFileForBridge } = require(
+  path.join(runtimeMainProcessDir, "workspace.js")
+);
+
+const { atomicWriteFile, atomicWriteFileSync } = require(
+  path.join(srcDir, "..", "dist", "runtime", "shared", "json", "atomicWrite.js")
+);
+
+const { parseNwWrldDocblockMetadata } = require(
+  path.join(srcDir, "..", "dist", "runtime", "shared", "nwWrldDocblock.js")
+);
 
 const { sanitizeJsonForBridge } = require(
   path.join(srcDir, "..", "dist", "runtime", "shared", "validation", "jsonBridgeValidation.js")

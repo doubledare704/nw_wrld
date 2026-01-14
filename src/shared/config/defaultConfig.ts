@@ -1,4 +1,4 @@
-const DEFAULT_INPUT_CONFIG = {
+export const DEFAULT_INPUT_CONFIG = {
   type: "midi",
   deviceName: "IAC Driver Bus 1",
   trackSelectionChannel: 2,
@@ -8,7 +8,7 @@ const DEFAULT_INPUT_CONFIG = {
   port: 8000,
 };
 
-const DEFAULT_GLOBAL_MAPPINGS = {
+export const DEFAULT_GLOBAL_MAPPINGS = {
   trackMappings: {
     midi: {
       pitchClass: {
@@ -101,7 +101,7 @@ const DEFAULT_GLOBAL_MAPPINGS = {
   },
 };
 
-const DEFAULT_USER_DATA = {
+export const DEFAULT_USER_DATA = {
   config: {
     activeSetId: "set_1",
     activeTrackId: null,
@@ -118,10 +118,4 @@ const DEFAULT_USER_DATA = {
       tracks: [],
     },
   ],
-};
-
-module.exports = {
-  DEFAULT_INPUT_CONFIG,
-  DEFAULT_GLOBAL_MAPPINGS,
-  DEFAULT_USER_DATA,
 };

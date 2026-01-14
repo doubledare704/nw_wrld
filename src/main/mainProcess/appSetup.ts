@@ -1,6 +1,30 @@
-const { app, protocol } = require("electron");
+type ElectronProtocol = {
+  registerSchemesAsPrivileged(
+    schemes: Array<{
+      scheme: string;
+      privileges: {
+        standard: boolean;
+        secure: boolean;
+        supportFetchAPI: boolean;
+        corsEnabled: boolean;
+      };
+    }>
+  ): void;
+};
 
-function setupApp() {
+type ElectronApp = {
+  setName(name: string): void;
+  getVersion(): string;
+  setAboutPanelOptions(opts: { applicationName: string; applicationVersion: string }): void;
+  commandLine: { appendSwitch(name: string, value?: string): void };
+};
+
+const { app, protocol } = require("electron") as {
+  app: ElectronApp;
+  protocol: ElectronProtocol;
+};
+
+export function setupApp() {
   app.setName("nw_wrld");
 
   protocol.registerSchemesAsPrivileged([
@@ -37,5 +61,3 @@ function setupApp() {
   app.commandLine.appendSwitch("enable-gpu-rasterization");
   app.commandLine.appendSwitch("enable-zero-copy");
 }
-
-module.exports = { setupApp };

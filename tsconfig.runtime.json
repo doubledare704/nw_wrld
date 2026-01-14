@@ -13,6 +13,10 @@
   },
   "include": [
     "src/types/vendor.d.ts",
+    "src/shared/nwWrldDocblock.ts",
+    "src/shared/config/defaultConfig.ts",
+    "src/shared/constants/inputStatus.cts",
+    "src/shared/json/atomicWrite.ts",
     "src/shared/validation/inputConfigValidation.ts",
     "src/shared/validation/inputEventValidation.ts",
     "src/shared/validation/jsonBridgeValidation.ts",
@@ -35,6 +39,12 @@
     "src/shared/utils/projectDir.ts",
     "src/shared/midi/midiUtils.ts",
     "src/shared/midi/midiPlayback.ts",
+    "src/main/mainProcess/state.ts",
+    "src/main/mainProcess/pathSafety.ts",
+    "src/main/mainProcess/workspace.ts",
+    "src/main/mainProcess/protocols.ts",
+    "src/main/mainProcess/lifecycle.ts",
+    "src/main/mainProcess/appSetup.ts",
     "src/main/InputManager.ts"
   ]
 }

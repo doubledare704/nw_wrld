@@ -1,7 +1,14 @@
-const fs = require("fs");
-const path = require("path");
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-const isExistingDirectoryFallback = (dirPath) => {
+type RuntimeValidation = Partial<{
+  isExistingDirectory: (dirPath: string) => boolean;
+  resolveWithinDir: (baseDir: string, relPath: string) => string | null;
+  safeModuleName: (moduleName: unknown) => string | null;
+  safeJsonFilename: (filename: unknown) => string | null;
+}>;
+
+const isExistingDirectoryFallback = (dirPath: string) => {
   try {
     return fs.statSync(dirPath).isDirectory();
   } catch {
@@ -9,7 +16,7 @@ const isExistingDirectoryFallback = (dirPath) => {
   }
 };
 
-const resolveWithinDirFallback = (baseDir, relPath) => {
+const resolveWithinDirFallback = (baseDir: string, relPath: string) => {
   if (!baseDir || typeof baseDir !== "string") return null;
   if (!relPath || typeof relPath !== "string") return null;
   const safeRel = String(relPath).replace(/^[/\\]+/, "");
@@ -34,9 +41,9 @@ const resolveWithinDirFallback = (baseDir, relPath) => {
       const relFromBase = path.relative(resolvedBase, resolved);
       const parts = relFromBase
         .split(path.sep)
-        .map((p) => String(p || "").trim())
+        .map((p: string) => String(p || "").trim())
         .filter(Boolean)
-        .filter((p) => p !== ".");
+        .filter((p: string) => p !== ".");
 
       let cursor = resolvedBase;
       for (const part of parts) {
@@ -70,14 +77,14 @@ const resolveWithinDirFallback = (baseDir, relPath) => {
   return resolved;
 };
 
-const safeModuleNameFallback = (moduleName) => {
+const safeModuleNameFallback = (moduleName: unknown) => {
   const safe = String(moduleName || "").trim();
   if (!safe) return null;
   if (!/^[A-Za-z][A-Za-z0-9]*$/.test(safe)) return null;
   return safe;
 };
 
-const safeJsonFilenameFallback = (filename) => {
+const safeJsonFilenameFallback = (filename: unknown) => {
   const safe = String(filename || "").trim();
   if (!safe) return null;
   if (
@@ -91,41 +98,26 @@ const safeJsonFilenameFallback = (filename) => {
   return safe;
 };
 
-let runtime = null;
+let runtime: RuntimeValidation | null = null;
 try {
-  runtime = require(path.join(
-    __dirname,
-    "..",
-    "..",
-    "..",
-    "dist",
-    "runtime",
-    "shared",
-    "validation",
-    "pathSafetyValidation.js"
-  ));
+  runtime = require(
+    path.join(__dirname, "..", "..", "shared", "validation", "pathSafetyValidation.js")
+  ) as RuntimeValidation;
 } catch {}
 
-const isExistingDirectory =
+export const isExistingDirectory =
   runtime && typeof runtime.isExistingDirectory === "function"
     ? runtime.isExistingDirectory
     : isExistingDirectoryFallback;
-const resolveWithinDir =
+export const resolveWithinDir =
   runtime && typeof runtime.resolveWithinDir === "function"
     ? runtime.resolveWithinDir
     : resolveWithinDirFallback;
-const safeModuleName =
+export const safeModuleName =
   runtime && typeof runtime.safeModuleName === "function"
     ? runtime.safeModuleName
     : safeModuleNameFallback;
-const safeJsonFilename =
+export const safeJsonFilename =
   runtime && typeof runtime.safeJsonFilename === "function"
     ? runtime.safeJsonFilename
     : safeJsonFilenameFallback;
-
-module.exports = {
-  isExistingDirectory,
-  resolveWithinDir,
-  safeModuleName,
-  safeJsonFilename,
-};
