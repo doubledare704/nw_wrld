@@ -19,6 +19,16 @@ const InputManager = InputManagerModule?.default || InputManagerModule;
 
 const { DEFAULT_USER_DATA } = require(path.join(srcDir, "shared", "config", "defaultConfig"));
 
+const { sanitizeJsonForBridge } = require(path.join(
+  srcDir,
+  "..",
+  "dist",
+  "runtime",
+  "shared",
+  "validation",
+  "jsonBridgeValidation.js"
+));
+
 const getProjectorAspectRatioValue = (aspectRatioId) => {
   const id = String(aspectRatioId || "").trim();
   if (!id || id === "default" || id === "landscape") return 0;
@@ -143,11 +153,19 @@ function loadConfig(projectDir) {
   try {
     const data = fs.readFileSync(configPath, "utf-8");
 
+    let parsed;
     try {
-      const parsed = JSON.parse(data);
-      return parsed;
+      parsed = JSON.parse(data);
     } catch (parseErr) {
       console.error("[Main] JSON parse error - config file is corrupted:", parseErr.message);
+      console.error("[Main] Using default configuration");
+      return DEFAULT_USER_DATA;
+    }
+
+    try {
+      return sanitizeJsonForBridge("userData.json", parsed, DEFAULT_USER_DATA);
+    } catch (sanitizeErr) {
+      console.error("[Main] Config sanitization error:", sanitizeErr.message);
       console.error("[Main] Using default configuration");
       return DEFAULT_USER_DATA;
     }

@@ -6,74 +6,59 @@ const { pathToFileURL } = require("url");
 const { app } = require("electron");
 
 const { state, srcDir } = require("./state");
-const { isExistingDirectory, resolveWithinDir, safeModuleName, safeJsonFilename } = require("./pathSafety");
+const {
+  isExistingDirectory,
+  resolveWithinDir,
+  safeModuleName,
+  safeJsonFilename,
+} = require("./pathSafety");
 const {
   getJsonStatusForProject,
   getJsonDirForBridge,
   maybeMigrateLegacyJsonFileForBridge,
 } = require("./workspace");
 
-const { atomicWriteFile, atomicWriteFileSync } = require(path.join(
-  srcDir,
-  "shared",
-  "json",
-  "atomicWrite.cjs"
-));
+const { atomicWriteFile, atomicWriteFileSync } = require(
+  path.join(srcDir, "shared", "json", "atomicWrite.cjs")
+);
 
 const { parseNwWrldDocblockMetadata } = require(path.join(srcDir, "shared", "nwWrldDocblock"));
 
-const { sanitizeJsonForBridge } = require(path.join(
-  srcDir,
-  "..",
-  "dist",
-  "runtime",
-  "shared",
-  "validation",
-  "jsonBridgeValidation.js"
-));
+const { sanitizeJsonForBridge } = require(
+  path.join(srcDir, "..", "dist", "runtime", "shared", "validation", "jsonBridgeValidation.js")
+);
 
-const { normalizeInputConfig } = require(path.join(
-  srcDir,
-  "..",
-  "dist",
-  "runtime",
-  "shared",
-  "validation",
-  "inputConfigValidation.js"
-));
+const { normalizeInputConfig } = require(
+  path.join(srcDir, "..", "dist", "runtime", "shared", "validation", "inputConfigValidation.js")
+);
 
-const {
-  normalizeModuleSummaries,
-  normalizeModuleWithMeta,
-  normalizeModuleUrlResult,
-} = require(path.join(
-  srcDir,
-  "..",
-  "dist",
-  "runtime",
-  "shared",
-  "validation",
-  "workspaceValidation.js"
-));
+const { normalizeModuleSummaries, normalizeModuleWithMeta, normalizeModuleUrlResult } = require(
+  path.join(srcDir, "..", "dist", "runtime", "shared", "validation", "workspaceValidation.js")
+);
 
-const { readJsonWithBackup, readJsonWithBackupSync } = require(path.join(
-  srcDir,
-  "..",
-  "dist",
-  "runtime",
-  "shared",
-  "json",
-  "readJsonWithBackup.js"
-));
+const { normalizeGetMethodCodeArgs, escapeRegExpLiteral } = require(
+  path.join(
+    srcDir,
+    "..",
+    "dist",
+    "runtime",
+    "shared",
+    "validation",
+    "methodCodeRequestValidation.js"
+  )
+);
 
-const InputManagerModule = require(path.join(
-  srcDir,
-  "..",
-  "dist",
-  "runtime",
-  "main",
-  "InputManager.js"
-));
+const { normalizeOpenExternalUrl } = require(
+  path.join(srcDir, "..", "dist", "runtime", "shared", "validation", "openExternalValidation.js")
+);
+
+const { readJsonWithBackup, readJsonWithBackupSync } = require(
+  path.join(srcDir, "..", "dist", "runtime", "shared", "json", "readJsonWithBackup.js")
+);
+
+const InputManagerModule = require(
+  path.join(srcDir, "..", "dist", "runtime", "main", "InputManager.js")
+);
 const InputManager = InputManagerModule?.default || InputManagerModule;
 
 const getProjectDirForEvent = (event) => {
@@ -486,7 +471,11 @@ function registerIpcBridge() {
           const pkg = JSON.parse(raw);
           const repo = pkg?.repository;
           const url =
-            typeof repo === "string" ? repo : repo && typeof repo.url === "string" ? repo.url : null;
+            typeof repo === "string"
+              ? repo
+              : repo && typeof repo.url === "string"
+                ? repo.url
+                : null;
           return url || null;
         } catch {
           return null;
@@ -508,6 +497,14 @@ function registerIpcBridge() {
 
   ipcMain.on("bridge:app:getMethodCode", (event, moduleName, methodName) => {
     try {
+      const normalized = normalizeGetMethodCodeArgs(moduleName, methodName);
+      if (!normalized.methodName) {
+        event.returnValue = { code: null, filePath: null };
+        return;
+      }
+      const safeMethodName = normalized.methodName;
+      const methodNameEscaped = escapeRegExpLiteral(safeMethodName);
+
       const moduleBasePath = path.join(srcDir, "projector", "helpers", "moduleBase.js");
       const threeBasePath = path.join(srcDir, "projector", "helpers", "threeBase.js");
 
@@ -530,7 +527,7 @@ function registerIpcBridge() {
 
       for (const p of searchOrder) {
         const content = fs.readFileSync(p, "utf-8");
-        const classMethodRegex = new RegExp(`\\s+${methodName}\\s*\\([^)]*\\)\\s*\\{`, "m");
+        const classMethodRegex = new RegExp(`\\s+${methodNameEscaped}\\s*\\([^)]*\\)\\s*\\{`, "m");
         if (classMethodRegex.test(content)) {
           filePath = p;
           fileContent = content;
@@ -543,7 +540,7 @@ function registerIpcBridge() {
         return;
       }
 
-      const methodNamePattern = new RegExp(`\\s+${methodName}\\s*\\(`, "m");
+      const methodNamePattern = new RegExp(`\\s+${methodNameEscaped}\\s*\\(`, "m");
       const methodNameMatch = fileContent.match(methodNamePattern);
       if (!methodNameMatch) {
         event.returnValue = { code: null, filePath };
@@ -631,7 +628,12 @@ function registerIpcBridge() {
 
   ipcMain.on("bridge:os:openExternal", (event, url) => {
     try {
-      shell.openExternal(String(url));
+      const normalized = normalizeOpenExternalUrl(url);
+      if (!normalized) {
+        event.returnValue = false;
+        return;
+      }
+      shell.openExternal(normalized).catch(() => {});
       event.returnValue = true;
     } catch {
       event.returnValue = false;
@@ -656,4 +658,3 @@ function registerIpcBridge() {
 }
 
 module.exports = { registerIpcBridge };
-
