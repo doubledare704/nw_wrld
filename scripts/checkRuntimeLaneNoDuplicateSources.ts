@@ -1,7 +1,7 @@
-const fs = require("node:fs");
-const path = require("node:path");
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-function fileExists(p) {
+function fileExists(p: string): boolean {
   try {
     return fs.existsSync(p);
   } catch {
@@ -9,22 +9,29 @@ function fileExists(p) {
   }
 }
 
-function readJson(p) {
+function readJson(p: string): unknown {
   const raw = fs.readFileSync(p, "utf-8");
-  return JSON.parse(raw);
+  return JSON.parse(raw) as unknown;
 }
 
-function main() {
-  const repoRoot = path.join(__dirname, "..");
-  const tsconfigPath = path.join(repoRoot, "tsconfig.runtime.json");
-  const tsconfig = readJson(tsconfigPath);
+type Offender = {
+  runtime: string;
+  duplicates: string[];
+};
 
-  const includes = Array.isArray(tsconfig?.include) ? tsconfig.include : [];
+export function findOffenders(repoRoot: string, tsconfigPath: string): Offender[] {
+  const tsconfigRaw = readJson(tsconfigPath);
+  const includesRaw =
+    tsconfigRaw && typeof tsconfigRaw === "object" && "include" in tsconfigRaw
+      ? (tsconfigRaw as { include?: unknown }).include
+      : undefined;
+  const includes = Array.isArray(includesRaw) ? includesRaw : [];
+
   const runtimeSources = includes
-    .filter((p) => typeof p === "string")
+    .filter((p): p is string => typeof p === "string")
     .filter((p) => p.endsWith(".ts") || p.endsWith(".cts") || p.endsWith(".mts"));
 
-  const offenders = [];
+  const offenders: Offender[] = [];
   for (const rel of runtimeSources) {
     const abs = path.join(repoRoot, rel);
     const dir = path.dirname(abs);
@@ -42,6 +49,17 @@ function main() {
       });
     }
   }
+
+  return offenders;
+}
+
+function main(): void {
+  const cwdRoot = path.resolve(process.cwd());
+  const cwdTsconfig = path.join(cwdRoot, "tsconfig.runtime.json");
+
+  const repoRoot = fileExists(cwdTsconfig) ? cwdRoot : path.resolve(__dirname, "..", "..");
+  const tsconfigPath = path.join(repoRoot, "tsconfig.runtime.json");
+  const offenders = findOffenders(repoRoot, tsconfigPath);
 
   if (offenders.length) {
     console.error(

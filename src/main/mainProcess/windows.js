@@ -246,7 +246,7 @@ function createWindow(projectDir) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(srcDir, "preload.js"),
+      preload: path.join(srcDir, "..", "dist", "runtime", "preload.js"),
       enableRemoteModule: false,
       backgroundThrottling: false,
       webgl: true,
@@ -292,7 +292,7 @@ function createWindow(projectDir) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(srcDir, "preload.js"),
+      preload: path.join(srcDir, "..", "dist", "runtime", "preload.js"),
       enableHardwareAcceleration: true,
       backgroundThrottling: false,
       additionalArguments: additionalArgs,

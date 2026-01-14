@@ -40,6 +40,8 @@
     "src/shared/utils/projectDir.ts",
     "src/shared/midi/midiUtils.ts",
     "src/shared/midi/midiPlayback.ts",
+    "src/preload.ts",
+    "src/sandboxPreload.ts",
     "src/main/mainProcess/state.ts",
     "src/main/mainProcess/pathSafety.ts",
     "src/main/mainProcess/workspace.ts",
