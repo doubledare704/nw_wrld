@@ -26,6 +26,13 @@ declare global {
             ) => void | (() => void);
             onWorkspaceLostSync?: (handler: (...args: unknown[]) => void) => void | (() => void);
           };
+          testing?: {
+            midi?: {
+              reset?: (devices: unknown) => Promise<unknown>;
+              disconnect?: (deviceId: unknown) => Promise<unknown>;
+              reconnect?: (device: unknown) => Promise<unknown>;
+            };
+          };
         }
       | undefined;
   }
