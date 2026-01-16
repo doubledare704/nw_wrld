@@ -30,9 +30,11 @@ import {
   normalizeModuleUrlResult,
   normalizeModuleWithMeta,
 } from "../../shared/validation/workspaceValidation";
+import { getOrCreateGlobalMockWebMidi } from "../testing/mockWebMidi";
 
 type WebContentsWithId = { id?: unknown };
 type SenderEvent = { sender?: WebContentsWithId };
+type Jsonish = string | number | boolean | null | undefined | object;
 
 const getProjectDirForEvent = (event: SenderEvent): string | null => {
   try {
@@ -42,6 +44,17 @@ const getProjectDirForEvent = (event: SenderEvent): string | null => {
     }
   } catch {}
   return state.currentProjectDir || null;
+};
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  Boolean(v) && typeof v === "object" && !Array.isArray(v);
+
+const stripIsDefaultDataFlag = (v: unknown): unknown => {
+  if (!isPlainObject(v)) return v;
+  if (!("_isDefaultData" in v)) return v;
+  const out = { ...v };
+  delete (out as { _isDefaultData?: unknown })._isDefaultData;
+  return out;
 };
 
 const MODULE_METADATA_MAX_BYTES = 16 * 1024;
@@ -314,8 +327,54 @@ export function registerIpcBridge(): void {
     }
     const dir = getJsonDirForBridge(projectDir);
     const filePath = path.join(dir, safeName);
+    if (safeName === "userData.json") {
+      let rawPrimary: string | null = null;
+      try {
+        rawPrimary = await fs.promises.readFile(filePath, "utf-8");
+      } catch {
+        rawPrimary = null;
+      }
+
+      if (rawPrimary != null) {
+        try {
+          const parsed = JSON.parse(rawPrimary) as unknown;
+          return sanitizeJsonForBridge(
+            safeName,
+            parsed as unknown as Jsonish,
+            defaultValue as unknown as Jsonish
+          );
+        } catch {
+          try {
+            const corruptPath = `${filePath}.corrupt.${Date.now()}`;
+            await fs.promises.writeFile(corruptPath, rawPrimary, "utf-8");
+          } catch {}
+          console.error("[Main] userData.json is corrupted, recovering with defaults");
+        }
+      }
+
+      try {
+        const raw = await fs.promises.readFile(`${filePath}.backup`, "utf-8");
+        const parsed = JSON.parse(raw) as unknown;
+        return sanitizeJsonForBridge(
+          safeName,
+          parsed as unknown as Jsonish,
+          defaultValue as unknown as Jsonish
+        );
+      } catch {}
+
+      const safeDefault = stripIsDefaultDataFlag(defaultValue);
+      return sanitizeJsonForBridge(
+        safeName,
+        safeDefault as unknown as Jsonish,
+        defaultValue as unknown as Jsonish
+      );
+    }
     const value = await readJsonWithBackup(filePath, defaultValue);
-    return sanitizeJsonForBridge(safeName, value, defaultValue);
+    return sanitizeJsonForBridge(
+      safeName,
+      value as unknown as Jsonish,
+      defaultValue as unknown as Jsonish
+    );
   });
 
   ipcMain.on("bridge:json:readSync", (event, filename, defaultValue) => {
@@ -332,8 +391,57 @@ export function registerIpcBridge(): void {
     }
     const dir = getJsonDirForBridge(projectDir);
     const filePath = path.join(dir, safeName);
+    if (safeName === "userData.json") {
+      let rawPrimary: string | null = null;
+      try {
+        rawPrimary = fs.readFileSync(filePath, "utf-8");
+      } catch {
+        rawPrimary = null;
+      }
+
+      if (rawPrimary != null) {
+        try {
+          const parsed = JSON.parse(rawPrimary) as unknown;
+          event.returnValue = sanitizeJsonForBridge(
+            safeName,
+            parsed as unknown as Jsonish,
+            defaultValue as unknown as Jsonish
+          );
+          return;
+        } catch {
+          try {
+            const corruptPath = `${filePath}.corrupt.${Date.now()}`;
+            fs.writeFileSync(corruptPath, rawPrimary, "utf-8");
+          } catch {}
+          console.error("[Main] userData.json is corrupted, recovering with defaults (sync)");
+        }
+      }
+
+      try {
+        const raw = fs.readFileSync(`${filePath}.backup`, "utf-8");
+        const parsed = JSON.parse(raw) as unknown;
+        event.returnValue = sanitizeJsonForBridge(
+          safeName,
+          parsed as unknown as Jsonish,
+          defaultValue as unknown as Jsonish
+        );
+        return;
+      } catch {}
+
+      const safeDefault = stripIsDefaultDataFlag(defaultValue);
+      event.returnValue = sanitizeJsonForBridge(
+        safeName,
+        safeDefault as unknown as Jsonish,
+        defaultValue as unknown as Jsonish
+      );
+      return;
+    }
     const value = readJsonWithBackupSync(filePath, defaultValue);
-    event.returnValue = sanitizeJsonForBridge(safeName, value, defaultValue);
+    event.returnValue = sanitizeJsonForBridge(
+      safeName,
+      value as unknown as Jsonish,
+      defaultValue as unknown as Jsonish
+    );
   });
 
   ipcMain.handle("bridge:json:write", async (event, filename, data) => {
@@ -386,12 +494,7 @@ export function registerIpcBridge(): void {
 
   ipcMain.on("bridge:app:getBaseMethodNames", (event) => {
     try {
-      const moduleBasePath = path.join(
-        srcDir,
-        "projector",
-        "helpers",
-        "moduleBase.ts"
-      );
+      const moduleBasePath = path.join(srcDir, "projector", "helpers", "moduleBase.ts");
       const threeBasePath = path.join(srcDir, "projector", "helpers", "threeBase.js");
       const moduleBaseContent = fs.readFileSync(moduleBasePath, "utf-8");
       const threeBaseContent = fs.readFileSync(threeBasePath, "utf-8");
@@ -498,12 +601,7 @@ export function registerIpcBridge(): void {
       const safeMethodName = normalized.methodName;
       const methodNameEscaped = escapeRegExpLiteral(safeMethodName);
 
-      const moduleBasePath = path.join(
-        srcDir,
-        "projector",
-        "helpers",
-        "moduleBase.ts"
-      );
+      const moduleBasePath = path.join(srcDir, "projector", "helpers", "moduleBase.ts");
       const threeBasePath = path.join(srcDir, "projector", "helpers", "threeBase.js");
 
       let filePath: string | null = null;
@@ -651,6 +749,46 @@ export function registerIpcBridge(): void {
   ipcMain.handle("input:get-midi-devices", async () => {
     return await InputManager.getAvailableMIDIDevices();
   });
+
+  const isTest = process.env.NODE_ENV === "test";
+  const isMockMidi = process.env.NW_WRLD_TEST_MIDI_MOCK === "1";
+  if (isTest && isMockMidi) {
+    const defaultDevices = [{ id: "e2e-midi-1", name: "E2E MIDI Device", manufacturer: "nw_wrld" }];
+    const mock = getOrCreateGlobalMockWebMidi(defaultDevices);
+    (globalThis as unknown as { __nwWrldWebMidiOverride?: unknown }).__nwWrldWebMidiOverride = mock;
+
+    ipcMain.handle("test:midi:reset", async (_event, devices: unknown) => {
+      const list = Array.isArray(devices)
+        ? (devices as Array<{ id?: unknown; name?: unknown; manufacturer?: unknown }>)
+        : [];
+      const normalized = list
+        .map((d) => ({
+          id: typeof d?.id === "string" ? d.id : "",
+          name: typeof d?.name === "string" ? d.name : "",
+          manufacturer: typeof d?.manufacturer === "string" ? d.manufacturer : "",
+        }))
+        .filter((d) => d.id && d.name);
+      mock.resetDevices(normalized);
+      return { ok: true };
+    });
+
+    ipcMain.handle("test:midi:disconnect", async (_event, deviceId: unknown) => {
+      const id = typeof deviceId === "string" ? deviceId : "";
+      if (!id) return { ok: false };
+      mock.disconnectDevice(id);
+      return { ok: true };
+    });
+
+    ipcMain.handle("test:midi:reconnect", async (_event, device: unknown) => {
+      const d = device && typeof device === "object" ? (device as Record<string, unknown>) : null;
+      const id = d && typeof d.id === "string" ? d.id : "";
+      const name = d && typeof d.name === "string" ? d.name : "";
+      const manufacturer = d && typeof d.manufacturer === "string" ? d.manufacturer : "";
+      if (!id || !name) return { ok: false };
+      mock.reconnectDevice({ id, name, manufacturer });
+      return { ok: true };
+    });
+  }
 
   ipcMain.on("log-to-main", (event, message) => {
     console.log(message);

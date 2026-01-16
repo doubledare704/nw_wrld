@@ -122,6 +122,18 @@ const nwWrldBridge = {
   },
 };
 
+const isTestEnv = process.env.NODE_ENV === "test";
+const isMockMidi = process.env.NW_WRLD_TEST_MIDI_MOCK === "1";
+if (isTestEnv && isMockMidi) {
+  (nwWrldBridge as unknown as { testing?: unknown }).testing = {
+    midi: {
+      reset: (devices: unknown) => ipcRenderer.invoke("test:midi:reset", devices),
+      disconnect: (deviceId: unknown) => ipcRenderer.invoke("test:midi:disconnect", deviceId),
+      reconnect: (device: unknown) => ipcRenderer.invoke("test:midi:reconnect", device),
+    },
+  };
+}
+
 if (isTopLevelFrame()) {
   contextBridge.exposeInMainWorld("nwWrldBridge", nwWrldBridge);
   contextBridge.exposeInMainWorld("nwWrldAppBridge", nwWrldAppBridge);

@@ -62,12 +62,22 @@ type CurrentSource =
   | { type: "osc"; instance: UDPPort }
   | null;
 
+const getWebMidiProvider = () => {
+  const g = globalThis as unknown as { __nwWrldWebMidiOverride?: unknown };
+  return (g.__nwWrldWebMidiOverride as any) || (WebMidi as any);
+};
+
 class InputManager {
   dashboard: WindowLike | null;
   projector: WindowLike | null;
   currentSource: CurrentSource;
   config: RuntimeInputConfig | null;
   connectionStatus: InputStatus;
+  private midiWebMidi: any | null;
+  private midiConnectedHandler: ((e: unknown) => void) | null;
+  private midiDisconnectedHandler: ((e: unknown) => void) | null;
+  private midiTargetDeviceId: string;
+  private midiTargetDeviceName: string;
 
   constructor(dashboardWindow: WindowLike, projectorWindow: WindowLike) {
     this.dashboard = dashboardWindow;
@@ -75,6 +85,78 @@ class InputManager {
     this.currentSource = null;
     this.config = null;
     this.connectionStatus = INPUT_STATUS.DISCONNECTED;
+    this.midiWebMidi = null;
+    this.midiConnectedHandler = null;
+    this.midiDisconnectedHandler = null;
+    this.midiTargetDeviceId = "";
+    this.midiTargetDeviceName = "";
+  }
+
+  private teardownMidiWebMidiListeners() {
+    const webMidi = this.midiWebMidi;
+    if (!webMidi) return;
+    try {
+      if (this.midiConnectedHandler && typeof webMidi.removeListener === "function") {
+        webMidi.removeListener("connected", this.midiConnectedHandler);
+      }
+    } catch {}
+    try {
+      if (this.midiDisconnectedHandler && typeof webMidi.removeListener === "function") {
+        webMidi.removeListener("disconnected", this.midiDisconnectedHandler);
+      }
+    } catch {}
+    this.midiWebMidi = null;
+    this.midiConnectedHandler = null;
+    this.midiDisconnectedHandler = null;
+    this.midiTargetDeviceId = "";
+    this.midiTargetDeviceName = "";
+  }
+
+  private installMidiWebMidiListeners(webMidi: any, deviceId: string, deviceName: string) {
+    this.teardownMidiWebMidiListeners();
+    this.midiWebMidi = webMidi;
+    this.midiTargetDeviceId = deviceId;
+    this.midiTargetDeviceName = deviceName;
+
+    const matchesTarget = (evt: unknown) => {
+      const e = evt && typeof evt === "object" ? (evt as Record<string, unknown>) : null;
+      const port = e && typeof e.port === "object" && e.port ? (e.port as Record<string, unknown>) : null;
+      const id = port && typeof port.id === "string" ? port.id : "";
+      const name = port && typeof port.name === "string" ? port.name : "";
+      if (deviceId && id && id === deviceId) return true;
+      if (deviceName && name && name === deviceName) return true;
+      return false;
+    };
+
+    this.midiDisconnectedHandler = (evt: unknown) => {
+      if (!matchesTarget(evt)) return;
+      if (!this.config || (this.config as RuntimeInputConfig).type !== "midi") return;
+      if (!this.currentSource || this.currentSource.type !== "midi") return;
+      try {
+        this.currentSource.instance.removeListener();
+      } catch {
+        try {
+          this.currentSource.instance.removeListener("noteon");
+        } catch {}
+      }
+      this.currentSource = null;
+      this.broadcastStatus(INPUT_STATUS.DISCONNECTED, `MIDI device disconnected: ${deviceName}`);
+    };
+
+    this.midiConnectedHandler = (evt: unknown) => {
+      if (!matchesTarget(evt)) return;
+      if (!this.config || (this.config as RuntimeInputConfig).type !== "midi") return;
+      if (this.connectionStatus === INPUT_STATUS.CONNECTING) return;
+      if (this.currentSource && this.currentSource.type === "midi") return;
+      this.initialize(this.config as RuntimeInputConfig).catch(() => {});
+    };
+
+    try {
+      if (typeof webMidi.addListener === "function") {
+        webMidi.addListener("disconnected", this.midiDisconnectedHandler);
+        webMidi.addListener("connected", this.midiConnectedHandler);
+      }
+    } catch {}
   }
 
   broadcast(eventType: InputEventPayload["type"], data: object) {
@@ -177,6 +259,7 @@ class InputManager {
     return new Promise<void>((resolve, reject) => {
       const setupMIDI = () => {
         try {
+          const webMidi = getWebMidiProvider();
           const deviceId =
             typeof midiConfig.deviceId === "string" &&
             midiConfig.deviceId.trim()
@@ -189,9 +272,9 @@ class InputManager {
               : "";
 
           const input =
-            (deviceId && typeof WebMidi.getInputById === "function"
-              ? WebMidi.getInputById(deviceId)
-              : null) || WebMidi.getInputByName(deviceName);
+            (deviceId && typeof webMidi.getInputById === "function"
+              ? webMidi.getInputById(deviceId)
+              : null) || webMidi.getInputByName(deviceName);
           if (!input) {
             const error = new Error(
               `MIDI device "${midiConfig.deviceName}" not found`
@@ -201,6 +284,10 @@ class InputManager {
             this.broadcastStatus(INPUT_STATUS.DISCONNECTED, "");
             return reject(error);
           }
+
+          const resolvedId = typeof input.id === "string" ? input.id : deviceId || "";
+          const resolvedName = typeof input.name === "string" ? input.name : deviceName || "";
+          this.installMidiWebMidiListeners(webMidi, resolvedId, resolvedName);
 
           input.addListener("noteon", (e: NoteOnEvent) => {
             const note = e.note.number;
@@ -228,7 +315,7 @@ class InputManager {
           this.currentSource = { type: "midi", instance: input };
           this.broadcastStatus(
             INPUT_STATUS.CONNECTED,
-            `MIDI: ${midiConfig.deviceName}`
+            `MIDI: ${resolvedName || midiConfig.deviceName}`
           );
           resolve();
         } catch (error) {
@@ -241,10 +328,11 @@ class InputManager {
         }
       };
 
-      if (WebMidi.enabled) {
+      const webMidi = getWebMidiProvider();
+      if (webMidi.enabled) {
         setupMIDI();
       } else {
-        WebMidi.enable((err) => {
+        webMidi.enable((err: Error) => {
           if (err) {
             console.error("[InputManager] MIDI enable failed:", err);
             this.currentSource = null;
@@ -343,6 +431,7 @@ class InputManager {
       if (this.currentSource) {
         switch (this.currentSource.type) {
           case "midi":
+            this.teardownMidiWebMidiListeners();
             if (this.currentSource.instance) {
               try {
                 this.currentSource.instance.removeListener();
@@ -350,12 +439,13 @@ class InputManager {
                 this.currentSource.instance.removeListener("noteon");
               }
             }
-            if (WebMidi.enabled && typeof WebMidi.disable === "function") {
+            const webMidi = getWebMidiProvider();
+            if (webMidi.enabled && typeof webMidi.disable === "function") {
               try {
-                await WebMidi.disable();
+                await webMidi.disable();
               } catch {
                 try {
-                  WebMidi.disable();
+                  webMidi.disable();
                 } catch {}
               }
             }
@@ -378,12 +468,13 @@ class InputManager {
 
   static getAvailableMIDIDevices() {
     return new Promise<MidiDeviceInfo[]>((resolve) => {
-      WebMidi.enable((err) => {
+      const webMidi = getWebMidiProvider();
+      webMidi.enable((err: Error) => {
         if (err) {
           console.error("[InputManager] Failed to enable WebMIDI:", err);
           return resolve([]);
         }
-        const devices = WebMidi.inputs.map((input) => ({
+        const devices = (webMidi.inputs || []).map((input: any) => ({
           id: input.id,
           name: input.name,
           manufacturer: input.manufacturer,

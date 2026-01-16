@@ -155,6 +155,19 @@ export function loadConfig(projectDir: string | null): unknown {
     } catch (parseErr) {
       const message = parseErr instanceof Error ? parseErr.message : String(parseErr);
       console.error("[Main] JSON parse error - config file is corrupted:", message);
+      try {
+        const corruptPath = `${configPath}.corrupt.${Date.now()}`;
+        fs.writeFileSync(corruptPath, data, "utf-8");
+      } catch {}
+      try {
+        const backupData = fs.readFileSync(`${configPath}.backup`, "utf-8");
+        const backupParsed = JSON.parse(backupData) as unknown;
+        return sanitizeJsonForBridge(
+          "userData.json",
+          backupParsed as Jsonish,
+          DEFAULT_USER_DATA as unknown as Jsonish
+        );
+      } catch {}
       console.error("[Main] Using default configuration");
       return DEFAULT_USER_DATA;
     }
