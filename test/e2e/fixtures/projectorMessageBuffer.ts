@@ -22,8 +22,20 @@ export async function installProjectorMessageBuffer(page: Page): Promise<void> {
 
     if (anyGlobal.__nwWrldE2EProjector?.installed) return;
 
+    const storageKey = "__nwWrldE2EProjectorMessages";
+    let existing: BufferedMessage[] = [];
+    try {
+      const raw = globalThis.sessionStorage?.getItem?.(storageKey) || null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed)) {
+          existing = parsed.filter((x) => x && typeof x === "object") as BufferedMessage[];
+        }
+      }
+    } catch {}
+
     anyGlobal.__nwWrldE2EProjector = {
-      messages: [],
+      messages: existing,
       installed: true,
     };
 
@@ -36,7 +48,14 @@ export async function installProjectorMessageBuffer(page: Page): Promise<void> {
         rawProps && typeof rawProps === "object" && !Array.isArray(rawProps)
           ? (rawProps as Record<string, unknown>)
           : {};
-      anyGlobal.__nwWrldE2EProjector?.messages.push({ type, props, ts: Date.now() });
+      const next = { type, props, ts: Date.now() };
+      anyGlobal.__nwWrldE2EProjector?.messages.push(next);
+      try {
+        globalThis.sessionStorage?.setItem?.(
+          storageKey,
+          JSON.stringify(anyGlobal.__nwWrldE2EProjector?.messages || [])
+        );
+      } catch {}
     });
     anyGlobal.__nwWrldE2EProjector.cleanup = typeof cleanup === "function" ? cleanup : undefined;
   });
@@ -47,6 +66,9 @@ export async function clearProjectorMessages(page: Page): Promise<void> {
     const anyGlobal = globalThis as unknown as {
       __nwWrldE2EProjector?: { messages: unknown[] };
     };
+    try {
+      globalThis.sessionStorage?.removeItem?.("__nwWrldE2EProjectorMessages");
+    } catch {}
     if (!anyGlobal.__nwWrldE2EProjector) return;
     anyGlobal.__nwWrldE2EProjector.messages = [];
   });
@@ -58,6 +80,14 @@ export async function getProjectorMessages(page: Page): Promise<BufferedMessage[
       __nwWrldE2EProjector?: { messages: BufferedMessage[] };
     };
     const msgs = anyGlobal.__nwWrldE2EProjector?.messages;
-    return Array.isArray(msgs) ? msgs : [];
+    if (Array.isArray(msgs)) return msgs;
+    try {
+      const raw = globalThis.sessionStorage?.getItem?.("__nwWrldE2EProjectorMessages") || null;
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed) ? (parsed as BufferedMessage[]) : [];
+    } catch {
+      return [];
+    }
   });
 }
