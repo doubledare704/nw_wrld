@@ -237,6 +237,7 @@ const Dashboard = () => {
   const [sequencerCurrentStep, setSequencerCurrentStep] = useState(0);
   const [isSequencerMuted, setIsSequencerMuted] = useState(false);
   const [isProjectorReady, setIsProjectorReady] = useState(false);
+  const [perfStats, setPerfStats] = useState(null);
   const isSequencerPlayingRef = useRef(false);
   useEffect(() => {
     isSequencerPlayingRef.current = isSequencerPlaying;
@@ -570,6 +571,21 @@ const Dashboard = () => {
         (prev || []).map((m) => (m && m.id === moduleId ? { ...m, status: "failed" } : m))
       );
     }
+  });
+
+  useIPCListener("from-projector", (_event, data) => {
+    if (!data || typeof data !== "object") return;
+    if (data.type !== "perf:stats") return;
+    const p = data.props;
+    if (!p || typeof p !== "object") return;
+    const fps = typeof p.fps === "number" && Number.isFinite(p.fps) ? p.fps : null;
+    const frameMsAvg =
+      typeof p.frameMsAvg === "number" && Number.isFinite(p.frameMsAvg) ? p.frameMsAvg : null;
+    const longFramePct =
+      typeof p.longFramePct === "number" && Number.isFinite(p.longFramePct) ? p.longFramePct : 0;
+    const at = typeof p.at === "number" && Number.isFinite(p.at) ? p.at : null;
+    if (fps == null || frameMsAvg == null || at == null) return;
+    setPerfStats({ fps, frameMsAvg, longFramePct, at });
   });
 
   const ipcInvoke = useIPCInvoke();
@@ -1320,6 +1336,7 @@ const Dashboard = () => {
         isOpen={isDebugOverlayOpen}
         onClose={() => setIsDebugOverlayOpen(false)}
         debugLogs={debugLogs}
+        perfStats={perfStats}
       />
       <MethodConfiguratorModal
         isOpen={!!selectedChannel}

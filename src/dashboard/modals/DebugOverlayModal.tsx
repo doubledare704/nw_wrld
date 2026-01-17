@@ -208,9 +208,11 @@ type DebugOverlayModalProps = {
   isOpen: boolean;
   onClose: () => void;
   debugLogs: string[];
+  perfStats?: { fps: number; frameMsAvg: number; longFramePct: number; at: number } | null;
 };
 
-export const DebugOverlayModal = memo(({ isOpen, onClose, debugLogs }: DebugOverlayModalProps) => {
+export const DebugOverlayModal = memo(
+  ({ isOpen, onClose, debugLogs, perfStats }: DebugOverlayModalProps) => {
   const logContainerRef = useRef<HTMLDivElement | null>(null);
   const scrollTimeoutRef = useRef<number | null>(null);
 
@@ -247,9 +249,28 @@ export const DebugOverlayModal = memo(({ isOpen, onClose, debugLogs }: DebugOver
           DEBUG
           <HelpIcon helpText={HELP_TEXT.debugOverlay} />
         </span>
-        <Button onClick={onClose} type="secondary">
-          CLOSE
-        </Button>
+        <div className="flex items-center gap-4">
+          {perfStats ? (
+            <div
+              data-testid="debug-perf-indicator"
+              className={`text-[11px] font-mono ${
+                perfStats.fps >= 55
+                  ? "text-emerald-400/70"
+                  : perfStats.fps >= 30
+                    ? "text-amber-400/70"
+                    : "text-red-400/70"
+              }`}
+              title={`FPS ${Math.round(perfStats.fps)} · ${Math.round(
+                perfStats.frameMsAvg
+              )}ms · ${Math.round(perfStats.longFramePct)}% long frames`}
+            >
+              FPS {Math.round(perfStats.fps)} · {Math.round(perfStats.frameMsAvg)}ms
+            </div>
+          ) : null}
+          <Button onClick={onClose} type="secondary">
+            CLOSE
+          </Button>
+        </div>
       </div>
       <div
         ref={logContainerRef}
@@ -267,7 +288,8 @@ export const DebugOverlayModal = memo(({ isOpen, onClose, debugLogs }: DebugOver
       </div>
     </div>
   );
-});
+  }
+);
 
 DebugOverlayModal.displayName = "DebugOverlayModal";
 

@@ -7,12 +7,11 @@ import {
   normalizeSandboxRequestProps,
   normalizeSandboxResult,
 } from "../../shared/validation/sandboxValidation";
+import { normalizeSandboxPerfStats } from "../../shared/validation/perfValidation";
 
 type WebContentsWithId = { id?: unknown; once?: unknown };
 type SenderEvent = { sender?: WebContentsWithId };
 type Jsonish = string | number | boolean | null | undefined | Jsonish[] | { [k: string]: Jsonish };
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const SANDBOX_ASSET_TEXT_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -508,6 +507,32 @@ export function registerSandboxIpc(): void {
     if (!data || typeof data !== "object") return;
 
     const token = String((data as { token?: unknown })?.token || "").trim();
+
+    if ((data as { __nwWrldSandboxPerf?: unknown }).__nwWrldSandboxPerf) {
+      if (!token || !state.activeSandboxToken || token !== state.activeSandboxToken) return;
+      const stats = normalizeSandboxPerfStats((data as { stats?: unknown })?.stats);
+      if (!stats) return;
+      const dashboard = state.dashboardWindow as {
+        isDestroyed?: unknown;
+        webContents?: { isDestroyed?: unknown; send?: unknown };
+      } | null;
+      if (
+        dashboard &&
+        typeof dashboard.isDestroyed === "function" &&
+        !dashboard.isDestroyed() &&
+        dashboard.webContents &&
+        typeof dashboard.webContents.isDestroyed === "function" &&
+        !dashboard.webContents.isDestroyed() &&
+        typeof dashboard.webContents.send === "function"
+      ) {
+        dashboard.webContents.send("from-projector", {
+          type: "perf:stats",
+          props: stats,
+        });
+      }
+      return;
+    }
+
     const requestId = String((data as { requestId?: unknown })?.requestId || "").trim();
     if (!token || !requestId) return;
 

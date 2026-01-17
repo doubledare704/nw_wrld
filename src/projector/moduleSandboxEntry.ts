@@ -59,7 +59,7 @@ const injectWorkspaceModuleImports = (moduleId, sourceText) => {
   return `${head}${preamble}\n${rest}`;
 };
 
-const getCallableMethodNames = (instance) => {
+const _getCallableMethodNames = (instance) => {
   const names = new Set();
   let proto = instance ? Object.getPrototypeOf(instance) : null;
   while (proto && proto !== Object.prototype) {
@@ -549,4 +549,54 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
 });
 
 postToHost({ __nwWrldSandboxReady: true, token: TOKEN });
+
+const perfToken = typeof TOKEN === "string" ? TOKEN : null;
+if (perfToken) {
+  let lastFrameAt = performance.now();
+  let reportStartedAt = lastFrameAt;
+  let frames = 0;
+  let sumDt = 0;
+  let longFrames = 0;
+
+  const REPORT_MS = 1000;
+  const LONG_FRAME_MS = 34;
+
+  const tick = () => {
+    const now = performance.now();
+    const dt = now - lastFrameAt;
+    lastFrameAt = now;
+
+    if (dt > 0 && Number.isFinite(dt)) {
+      frames += 1;
+      sumDt += dt;
+      if (dt >= LONG_FRAME_MS) longFrames += 1;
+    }
+
+    const elapsed = now - reportStartedAt;
+    if (elapsed >= REPORT_MS && frames > 0) {
+      const fps = (frames * 1000) / elapsed;
+      const frameMsAvg = sumDt / frames;
+      const longFramePct = (longFrames / frames) * 100;
+      postToHost({
+        "__nwWrldSandboxPerf": true,
+        token: perfToken,
+        stats: {
+          fps,
+          frameMsAvg,
+          longFramePct,
+          at: Date.now(),
+        },
+      });
+      reportStartedAt = now;
+      frames = 0;
+      sumDt = 0;
+      longFrames = 0;
+    }
+
+    requestAnimationFrame(tick);
+  };
+
+  requestAnimationFrame(tick);
+}
+
 
