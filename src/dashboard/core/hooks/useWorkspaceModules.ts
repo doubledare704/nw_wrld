@@ -31,6 +31,7 @@ type UseWorkspaceModulesArgs = {
   setPredefinedModules: Dispatch<SetStateAction<ModuleEntry[]>>;
   setWorkspaceModuleFiles: Dispatch<SetStateAction<string[]>>;
   setWorkspaceModuleLoadFailures: Dispatch<SetStateAction<string[]>>;
+  setWorkspaceModuleSkipped: Dispatch<SetStateAction<Array<{ file: string; reason: string }>>>;
   setIsProjectorReady: Dispatch<SetStateAction<boolean>>;
   didMigrateWorkspaceModuleTypesRef: MutableRefObject<boolean>;
   loadModulesRunIdRef: MutableRefObject<number>;
@@ -47,6 +48,7 @@ export const useWorkspaceModules = ({
   setPredefinedModules,
   setWorkspaceModuleFiles,
   setWorkspaceModuleLoadFailures,
+  setWorkspaceModuleSkipped,
   setIsProjectorReady,
   didMigrateWorkspaceModuleTypesRef,
   loadModulesRunIdRef,
@@ -60,16 +62,25 @@ export const useWorkspaceModules = ({
       if (!projectDirArg) return;
       if (!workspacePath) return;
       let summaries: unknown[] = [];
+      let skipped: unknown[] = [];
       try {
         const bridge = globalThis.nwWrldBridge as unknown as {
-          workspace?: { listModuleSummaries?: () => Promise<unknown[]> };
+          workspace?: {
+            listModuleSummaries?: () => Promise<unknown[]>;
+            listModuleSummariesWithSkipped?: () => Promise<unknown>;
+          };
         };
-        if (
-          bridge &&
-          bridge.workspace &&
-          typeof bridge.workspace.listModuleSummaries === "function"
-        ) {
-          summaries = await bridge.workspace.listModuleSummaries();
+        if (bridge && bridge.workspace) {
+          if (typeof bridge.workspace.listModuleSummariesWithSkipped === "function") {
+            const res = await bridge.workspace.listModuleSummariesWithSkipped();
+            const rec = res as { summaries?: unknown; skipped?: unknown };
+            summaries = Array.isArray(rec?.summaries) ? (rec.summaries as unknown[]) : [];
+            skipped = Array.isArray(rec?.skipped) ? (rec.skipped as unknown[]) : [];
+          } else if (typeof bridge.workspace.listModuleSummaries === "function") {
+            summaries = await bridge.workspace.listModuleSummaries();
+          } else {
+            summaries = [];
+          }
         } else {
           summaries = [];
         }
@@ -77,6 +88,16 @@ export const useWorkspaceModules = ({
         summaries = [];
       }
       const safeSummaries = Array.isArray(summaries) ? summaries : [];
+      const safeSkipped = Array.isArray(skipped) ? skipped : [];
+      const skippedRows = safeSkipped
+        .map((s) => {
+          const rec = s as { file?: unknown; reason?: unknown };
+          const file = rec?.file ? String(rec.file) : "";
+          const reason = rec?.reason ? String(rec.reason) : "";
+          if (!file || !reason) return null;
+          return { file, reason };
+        })
+        .filter(Boolean) as Array<{ file: string; reason: string }>;
       const allModuleIds = safeSummaries
         .map((s) => {
           const rec = s as { id?: unknown };
@@ -88,6 +109,7 @@ export const useWorkspaceModules = ({
       );
       if (isStale()) return;
       setWorkspaceModuleFiles(allModuleIds);
+      setWorkspaceModuleSkipped(skippedRows);
 
       const validModules = listable
         .map((s) => {
@@ -124,6 +146,7 @@ export const useWorkspaceModules = ({
     setWorkspaceModuleFiles,
     setPredefinedModules,
     setWorkspaceModuleLoadFailures,
+    setWorkspaceModuleSkipped,
     setIsProjectorReady,
     loadModulesRunIdRef,
   ]);

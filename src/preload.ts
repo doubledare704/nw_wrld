@@ -47,6 +47,8 @@ const nwWrldBridge = {
   workspace: {
     listModuleFiles: () => ipcRenderer.invoke("bridge:workspace:listModuleFiles"),
     listModuleSummaries: () => ipcRenderer.invoke("bridge:workspace:listModuleSummaries"),
+    listModuleSummariesWithSkipped: () =>
+      ipcRenderer.invoke("bridge:workspace:listModuleSummariesWithSkipped"),
     getModuleUrl: (moduleName: unknown) =>
       ipcRenderer.invoke("bridge:workspace:getModuleUrl", moduleName),
     readModuleText: (moduleName: unknown) =>

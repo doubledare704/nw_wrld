@@ -120,6 +120,7 @@ const Dashboard = () => {
   const [perfStats, setPerfStats] = useState(null);
   const [workspaceModuleFiles, setWorkspaceModuleFiles] = useState([]);
   const [workspaceModuleLoadFailures, setWorkspaceModuleLoadFailures] = useState([]);
+  const [workspaceModuleSkipped, setWorkspaceModuleSkipped] = useState([]);
   const didMigrateWorkspaceModuleTypesRef = useRef(false);
   const loadModulesRunIdRef = useRef(0);
   const sequencerMutedRef = useLatestRef(isSequencerMuted);
@@ -330,6 +331,7 @@ const Dashboard = () => {
     setPredefinedModules,
     setWorkspaceModuleFiles,
     setWorkspaceModuleLoadFailures,
+    setWorkspaceModuleSkipped,
     setIsProjectorReady,
     didMigrateWorkspaceModuleTypesRef,
     loadModulesRunIdRef,
@@ -632,6 +634,7 @@ const Dashboard = () => {
         onDeleteChannel={handleDeleteChannel}
         workspaceModuleFiles={workspaceModuleFiles}
         workspaceModuleLoadFailures={workspaceModuleLoadFailures}
+        workspaceModuleSkipped={workspaceModuleSkipped}
         editChannelModalState={editChannelModalState}
         setEditChannelModalState={setEditChannelModalState}
         confirmationModal={confirmationModal}

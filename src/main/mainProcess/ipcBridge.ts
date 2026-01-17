@@ -27,6 +27,7 @@ import {
 import { normalizeOpenExternalUrl } from "../../shared/validation/openExternalValidation";
 import {
   normalizeModuleSummaries,
+  normalizeWorkspaceModuleScanResult,
   normalizeModuleUrlResult,
   normalizeModuleWithMeta,
 } from "../../shared/validation/workspaceValidation";
@@ -58,6 +59,7 @@ const stripIsDefaultDataFlag = (v: unknown): unknown => {
 };
 
 const MODULE_METADATA_MAX_BYTES = 16 * 1024;
+const MODULE_ID_RULE = "^[A-Za-z][A-Za-z0-9]*$";
 
 const readFileHeadUtf8 = async (filePath: string, maxBytes: number): Promise<string> => {
   let fh: fs.promises.FileHandle | undefined;
@@ -73,6 +75,48 @@ const readFileHeadUtf8 = async (filePath: string, maxBytes: number): Promise<str
       await fh?.close?.();
     } catch {}
   }
+};
+
+const scanWorkspaceModuleSummaries = async (modulesDir: string) => {
+  let entries: string[] = [];
+  try {
+    entries = await fs.promises.readdir(modulesDir);
+  } catch {
+    entries = [];
+  }
+
+  const jsFiles = entries.filter((f) => String(f).endsWith(".js"));
+  const skipped: Array<{ file: string; reason: string }> = [];
+
+  const summaries = await Promise.all(
+    jsFiles.map(async (file) => {
+      const filename = String(file);
+      const moduleId = filename.replace(/\.js$/i, "");
+      const safe = safeModuleName(moduleId);
+      if (!safe) {
+        skipped.push({
+          file: filename,
+          reason: `Invalid filename: must match ${MODULE_ID_RULE}`,
+        });
+        return null;
+      }
+      const fullPath = resolveWithinDir(modulesDir, `${safe}.js`);
+      if (!fullPath) return null;
+
+      const head = await readFileHeadUtf8(fullPath, MODULE_METADATA_MAX_BYTES);
+      const meta = parseNwWrldDocblockMetadata(head, MODULE_METADATA_MAX_BYTES);
+
+      return {
+        file: filename,
+        id: safe,
+        name: meta.name,
+        category: meta.category,
+        hasMetadata: meta.hasMetadata,
+      };
+    })
+  );
+
+  return normalizeWorkspaceModuleScanResult({ summaries, skipped });
 };
 
 export function registerIpcBridge(): void {
@@ -103,39 +147,17 @@ export function registerIpcBridge(): void {
     const projectDir = getProjectDirForEvent(event as unknown as SenderEvent);
     if (!projectDir || !isExistingDirectory(projectDir)) return [];
     const modulesDir = path.join(projectDir, "modules");
+    const res = await scanWorkspaceModuleSummaries(modulesDir);
+    return normalizeModuleSummaries(res.summaries);
+  });
 
-    let entries: string[] = [];
-    try {
-      entries = await fs.promises.readdir(modulesDir);
-    } catch {
-      entries = [];
+  ipcMain.handle("bridge:workspace:listModuleSummariesWithSkipped", async (event) => {
+    const projectDir = getProjectDirForEvent(event as unknown as SenderEvent);
+    if (!projectDir || !isExistingDirectory(projectDir)) {
+      return normalizeWorkspaceModuleScanResult(null);
     }
-
-    const jsFiles = entries.filter((f) => String(f).endsWith(".js"));
-
-    const summaries = await Promise.all(
-      jsFiles.map(async (file) => {
-        const filename = String(file);
-        const moduleId = filename.replace(/\.js$/i, "");
-        const safe = safeModuleName(moduleId);
-        if (!safe) return null;
-        const fullPath = resolveWithinDir(modulesDir, `${safe}.js`);
-        if (!fullPath) return null;
-
-        const head = await readFileHeadUtf8(fullPath, MODULE_METADATA_MAX_BYTES);
-        const meta = parseNwWrldDocblockMetadata(head, MODULE_METADATA_MAX_BYTES);
-
-        return {
-          file: filename,
-          id: safe,
-          name: meta.name,
-          category: meta.category,
-          hasMetadata: meta.hasMetadata,
-        };
-      })
-    );
-
-    return normalizeModuleSummaries(summaries);
+    const modulesDir = path.join(projectDir, "modules");
+    return await scanWorkspaceModuleSummaries(modulesDir);
   });
 
   ipcMain.handle("bridge:workspace:readModuleWithMeta", async (event, moduleName) => {

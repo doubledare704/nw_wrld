@@ -86,6 +86,7 @@ type DashboardModalLayerProps = {
   onDeleteChannel: (channelNumber: number) => void;
   workspaceModuleFiles: string[];
   workspaceModuleLoadFailures: string[];
+  workspaceModuleSkipped: Array<{ file: string; reason: string }>;
 
   editChannelModalState: { isOpen: boolean; trackIndex: number | null; channelNumber: number | null };
   setEditChannelModalState: (next: {
@@ -160,6 +161,7 @@ export const DashboardModalLayer = ({
   onDeleteChannel,
   workspaceModuleFiles,
   workspaceModuleLoadFailures,
+  workspaceModuleSkipped,
   editChannelModalState,
   setEditChannelModalState,
   confirmationModal,
@@ -250,6 +252,7 @@ export const DashboardModalLayer = ({
         predefinedModules={predefinedModules}
         onCreateNewModule={onCreateNewModule}
         onEditModule={onEditModule}
+        skippedWorkspaceModules={workspaceModuleSkipped}
         mode="add-to-track"
       />
       <AddModuleModal
@@ -261,6 +264,7 @@ export const DashboardModalLayer = ({
         predefinedModules={predefinedModules}
         onCreateNewModule={onCreateNewModule}
         onEditModule={onEditModule}
+        skippedWorkspaceModules={workspaceModuleSkipped}
         mode="manage-modules"
       />
       <ModuleEditorModal

@@ -47,6 +47,7 @@ type AddModuleModalProps = {
   userData: UserData;
   setUserData: (updater: unknown) => void;
   predefinedModules: PredefinedModule[];
+  skippedWorkspaceModules?: Array<{ file: string; reason: string }>;
   onCreateNewModule?: () => void;
   onEditModule: (moduleId: string) => void;
   mode?: "add-to-track" | "manage-modules";
@@ -59,6 +60,7 @@ export const AddModuleModal = ({
   userData,
   setUserData,
   predefinedModules,
+  skippedWorkspaceModules,
   onCreateNewModule: _onCreateNewModule,
   onEditModule,
   mode = "add-to-track",
@@ -200,6 +202,16 @@ export const AddModuleModal = ({
     },
     {} as Record<string, PredefinedModule[]>
   );
+
+  const skippedList = useMemo(() => {
+    const list = Array.isArray(skippedWorkspaceModules) ? skippedWorkspaceModules : [];
+    return list
+      .map((s) => ({
+        file: s?.file ? String(s.file) : "",
+        reason: s?.reason ? String(s.reason) : "",
+      }))
+      .filter((s) => Boolean(s.file && s.reason));
+  }, [skippedWorkspaceModules]);
 
   const handlePreviewHandshake = useCallback((event: unknown, data: unknown) => {
     if (!data || typeof data !== "object") return;
@@ -481,6 +493,25 @@ export const AddModuleModal = ({
             </div>
           </div>
         ))}
+
+        {skippedList.length > 0 ? (
+          <div className="mt-6 font-mono border-t border-neutral-800 pt-4">
+            <div className="mb-2 opacity-50 text-[11px] text-neutral-300">Skipped modules:</div>
+            <div className="pl-6 flex flex-col gap-2">
+              {skippedList.map((s) => (
+                <div key={s.file} className="flex items-start gap-2 text-[11px] text-neutral-300">
+                  <span className="text-red-500/70 mt-[1px]">
+                    <FaExclamationTriangle />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="truncate">{s.file}</div>
+                    <div className="opacity-60">{s.reason}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </Modal>
   );
