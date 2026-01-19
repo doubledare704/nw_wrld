@@ -121,21 +121,30 @@ const nwWrldBridge = {
     },
     configureInput: (payload: unknown) => ipcRenderer.invoke("input:configure", payload),
     getMidiDevices: () => ipcRenderer.invoke("input:get-midi-devices"),
+    emitAudioBand: (payload: unknown) => ipcRenderer.invoke("input:audio:emitBand", payload),
     selectWorkspace: () => ipcRenderer.invoke("workspace:select"),
   },
 };
 
 const isTestEnv = process.env.NODE_ENV === "test";
 const isMockMidi = process.env.NW_WRLD_TEST_MIDI_MOCK === "1";
-if (isTestEnv && isMockMidi) {
-  (nwWrldBridge as unknown as { testing?: unknown }).testing = {
-    midi: {
+const isMockAudio = process.env.NW_WRLD_TEST_AUDIO_MOCK === "1";
+if (isTestEnv && (isMockMidi || isMockAudio)) {
+  const testing: Record<string, unknown> = {};
+  if (isMockMidi) {
+    testing.midi = {
       reset: (devices: unknown) => ipcRenderer.invoke("test:midi:reset", devices),
       disconnect: (deviceId: unknown) => ipcRenderer.invoke("test:midi:disconnect", deviceId),
       reconnect: (device: unknown) => ipcRenderer.invoke("test:midi:reconnect", device),
       noteOn: (payload: unknown) => ipcRenderer.invoke("test:midi:noteOn", payload),
-    },
-  };
+    };
+  }
+  if (isMockAudio) {
+    testing.audio = {
+      emitBand: (payload: unknown) => ipcRenderer.invoke("test:audio:emitBand", payload),
+    };
+  }
+  (nwWrldBridge as unknown as { testing?: unknown }).testing = testing;
 }
 
 if (isTopLevelFrame()) {

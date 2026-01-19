@@ -125,6 +125,93 @@ const DraftIntInput = memo(({ value, fallback, onCommit, ...props }: DraftIntInp
   );
 });
 
+type DraftFloatInputProps = {
+  value: number;
+  fallback: number;
+  onCommit: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  "data-testid"?: string;
+};
+
+const DraftFloatInput = memo(({ value, fallback, onCommit, ...props }: DraftFloatInputProps) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const skipCommitRef = useRef(false);
+
+  useEffect(() => {
+    if (!isFocused) setDraft(null);
+  }, [isFocused, value]);
+
+  const displayed = draft !== null ? draft : String(value ?? "");
+
+  const commitIfValid = useCallback(
+    (raw: string) => {
+      const s = String(raw);
+      const isIntermediate =
+        s === "" || s === "-" || s === "." || s === "-." || s.endsWith(".") || /e[+-]?$/i.test(s);
+      if (isIntermediate) return;
+      const n = parseFloat(s);
+      if (!Number.isFinite(n)) return;
+      onCommit(n);
+    },
+    [onCommit]
+  );
+
+  const commitOnBlur = useCallback(() => {
+    if (draft === null) return;
+    const s = String(draft);
+    const isIntermediate =
+      s === "" || s === "-" || s === "." || s === "-." || s.endsWith(".") || /e[+-]?$/i.test(s);
+    if (isIntermediate) {
+      onCommit(fallback);
+      return;
+    }
+    const n = parseFloat(s);
+    if (!Number.isFinite(n)) {
+      onCommit(fallback);
+      return;
+    }
+    onCommit(n);
+  }, [draft, fallback, onCommit]);
+
+  return (
+    <NumberInput
+      {...props}
+      value={displayed}
+      onFocus={() => {
+        skipCommitRef.current = false;
+        setIsFocused(true);
+        setDraft(String(value ?? ""));
+      }}
+      onChange={(e: ChangeEvent<HTMLInputElement>) => {
+        const next = e.target.value;
+        setDraft(next);
+        commitIfValid(next);
+      }}
+      onBlur={() => {
+        setIsFocused(false);
+        if (skipCommitRef.current) {
+          skipCommitRef.current = false;
+          return;
+        }
+        commitOnBlur();
+      }}
+      onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") {
+          skipCommitRef.current = true;
+          setDraft(null);
+          e.currentTarget.blur();
+        }
+      }}
+    />
+  );
+});
+
 type UserColorsProps = {
   config: { userColors?: string[] };
   updateConfig: (updates: { userColors: string[] }) => void;
@@ -284,10 +371,17 @@ type MidiDevice = {
   name: string;
 };
 
+type AudioDevice = {
+  id: string;
+  label: string;
+};
+
 type InputConfig = {
   type?: string;
   deviceId?: string;
   deviceName?: string;
+  audioThresholds?: { low?: number; medium?: number; high?: number };
+  audioMinIntervalMs?: number;
   methodTriggerChannel?: number;
   trackSelectionChannel?: number;
   noteMatchMode?: string;
@@ -314,6 +408,14 @@ type SettingsModalProps = {
   inputConfig: InputConfig;
   setInputConfig: (config: InputConfig) => void;
   availableMidiDevices: MidiDevice[];
+  availableAudioDevices: AudioDevice[];
+  refreshAudioDevices: () => Promise<void>;
+  audioCaptureState:
+    | { status: "idle"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number> }
+    | { status: "starting"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number> }
+    | { status: "running"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number> }
+    | { status: "error"; message: string; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number> }
+    | { status: "mock"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number> };
   onOpenMappings: () => void;
   config: Config;
   updateConfig: (updates: Partial<Config>) => void;
@@ -332,18 +434,24 @@ export const SettingsModal = ({
   inputConfig,
   setInputConfig,
   availableMidiDevices,
+  availableAudioDevices,
+  refreshAudioDevices,
+  audioCaptureState,
   onOpenMappings,
   config,
   updateConfig,
   workspacePath,
   onSelectWorkspace,
 }: SettingsModalProps) => {
-  const normalizedInputType = inputConfig?.type === "osc" ? "osc" : "midi";
+  const normalizedInputType =
+    inputConfig?.type === "osc" ? "osc" : inputConfig?.type === "audio" ? "audio" : "midi";
   const signalSourceValue = config.sequencerMode
     ? "sequencer"
     : normalizedInputType === "osc"
       ? "external-osc"
-      : "external-midi";
+      : normalizedInputType === "audio"
+        ? "external-audio"
+        : "external-midi";
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
@@ -406,6 +514,49 @@ export const SettingsModal = ({
                   className="cursor-pointer text-[11px] font-mono text-neutral-300"
                 >
                   External OSC
+                </label>
+              </div>
+              <div className="flex items-center gap-3 py-1">
+                <RadioButton
+                  id="signal-external-audio"
+                  name="signalSource"
+                  value="external-audio"
+                  checked={signalSourceValue === "external-audio"}
+                  onChange={() => {
+                    updateConfig({ sequencerMode: false });
+                    const rawThr =
+                      inputConfig.audioThresholds && typeof inputConfig.audioThresholds === "object"
+                        ? inputConfig.audioThresholds
+                        : null;
+                    const thr = {
+                      low: typeof rawThr?.low === "number" && Number.isFinite(rawThr.low) ? rawThr.low : 0.18,
+                      medium:
+                        typeof rawThr?.medium === "number" && Number.isFinite(rawThr.medium)
+                          ? rawThr.medium
+                          : 0.18,
+                      high:
+                        typeof rawThr?.high === "number" && Number.isFinite(rawThr.high) ? rawThr.high : 0.18,
+                    };
+                    const interval =
+                      typeof inputConfig.audioMinIntervalMs === "number" &&
+                      Number.isFinite(inputConfig.audioMinIntervalMs)
+                        ? inputConfig.audioMinIntervalMs
+                        : 90;
+                    setInputConfig({
+                      ...inputConfig,
+                      type: "audio",
+                      deviceId: "",
+                      deviceName: "",
+                      audioThresholds: thr,
+                      audioMinIntervalMs: interval,
+                    });
+                  }}
+                />
+                <label
+                  htmlFor="signal-external-audio"
+                  className="cursor-pointer text-[11px] font-mono text-neutral-300"
+                >
+                  External Audio (Low / Medium / High)
                 </label>
               </div>
             </div>
@@ -561,6 +712,140 @@ export const SettingsModal = ({
                   <div className="pl-12">
                     <div className="text-[10px] opacity-50">
                       Send OSC to: localhost:{inputConfig.port}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {normalizedInputType === "audio" && (
+                <>
+                  <div className="pl-12">
+                    <div className="opacity-50 mb-1 text-[11px]">Audio Input Device:</div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        id="audioDevice"
+                        value={typeof inputConfig.deviceId === "string" ? inputConfig.deviceId : ""}
+                        onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+                          const nextDeviceId = e.target.value;
+                          const selected = availableAudioDevices.find((d) => d.id === nextDeviceId);
+                          setInputConfig({
+                            ...inputConfig,
+                            deviceId: nextDeviceId,
+                            deviceName: selected?.label || "",
+                          });
+                        }}
+                        className="py-1 w-full"
+                      >
+                        <option value="" className="bg-[#101010]">
+                          Default device
+                        </option>
+                        {availableAudioDevices.map((device) => (
+                          <option key={device.id} value={device.id} className="bg-[#101010]">
+                            {device.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        onClick={() => {
+                          refreshAudioDevices().catch(() => {});
+                        }}
+                        className="px-3"
+                      >
+                        REFRESH
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="pl-12">
+                    <div className="text-[10px] opacity-50">
+                      Status:{" "}
+                      {audioCaptureState.status === "error"
+                        ? `Error: ${audioCaptureState.message}`
+                        : audioCaptureState.status}
+                    </div>
+                    <div className="mt-3 flex flex-col gap-3">
+                      <div>
+                        <div className="text-[10px] opacity-50 mb-1">Trigger Cooldown (ms)</div>
+                        <DraftIntInput
+                          value={
+                            typeof inputConfig.audioMinIntervalMs === "number" &&
+                            Number.isFinite(inputConfig.audioMinIntervalMs)
+                              ? inputConfig.audioMinIntervalMs
+                              : 90
+                          }
+                          fallback={90}
+                          onCommit={(next: number) =>
+                            setInputConfig({
+                              ...inputConfig,
+                              audioMinIntervalMs: Math.max(0, Math.min(10_000, next)),
+                            })
+                          }
+                          step={10}
+                          min={0}
+                          max={10_000}
+                          className="py-1 w-full"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        {(["low", "medium", "high"] as const).map((band) => {
+                          const v0 = audioCaptureState.levels?.[band];
+                          const v = typeof v0 === "number" && Number.isFinite(v0) ? Math.max(0, Math.min(1, v0)) : 0;
+                          const pct = Math.round(v * 100);
+
+                          const db0 = audioCaptureState.peaksDb?.[band];
+                          const db = typeof db0 === "number" && Number.isFinite(db0) ? db0 : -Infinity;
+
+                          const th0 =
+                            inputConfig.audioThresholds && typeof inputConfig.audioThresholds === "object"
+                              ? inputConfig.audioThresholds[band]
+                              : undefined;
+                          const th = typeof th0 === "number" && Number.isFinite(th0) ? Math.max(0, Math.min(1, th0)) : 0.18;
+
+                          return (
+                            <div key={band} className="grid grid-cols-[80px_1fr_110px] gap-2 items-center">
+                              <div>
+                                <div className="text-[10px] opacity-50">{band.toUpperCase()}</div>
+                                <div className="text-[10px] text-neutral-400">
+                                  {v.toFixed(2)} / {db === -Infinity ? "--" : `${db.toFixed(1)} dB`}
+                                </div>
+                              </div>
+
+                              <div className="h-2 w-full bg-neutral-800 rounded relative">
+                                <div className="h-2 bg-green-500 rounded" style={{ width: `${pct}%` }} />
+                                <div
+                                  className="absolute top-0 h-2 w-[2px] bg-white/40"
+                                  style={{ left: `${Math.round(th * 100)}%` }}
+                                />
+                              </div>
+
+                              <div>
+                                <div className="text-[10px] opacity-50 mb-1">Threshold</div>
+                                <DraftFloatInput
+                                  value={th}
+                                  fallback={0.18}
+                                  onCommit={(next: number) =>
+                                    setInputConfig({
+                                      ...inputConfig,
+                                      audioThresholds: {
+                                        ...(inputConfig.audioThresholds || {}),
+                                        [band]: Math.max(0, Math.min(1, next)),
+                                      },
+                                    })
+                                  }
+                                  step={0.01}
+                                  min={0}
+                                  max={1}
+                                  className="py-1 w-full"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="text-[10px] opacity-50">
+                      For system audio, use a loopback/virtual device and select it here.
                     </div>
                   </div>
                 </>

@@ -151,8 +151,9 @@ export const useInputEvents = ({
         : null;
 
     const timeStr = timestamp.toFixed(5);
-    const sourceLabel = source === "midi" ? "MIDI" : source === "osc" ? "OSC" : "Input";
-    const eventTypeLabel = type === "track-selection" ? "Track Selection" : "Channel Trigger";
+    const sourceLabel =
+      source === "midi" ? "MIDI" : source === "osc" ? "OSC" : source === "audio" ? "AUDIO" : "Input";
+    const eventTypeLabel = type === "track-selection" ? "Track Selection" : "Method Trigger";
 
     let log = `[${timeStr}] ${sourceLabel} ${eventTypeLabel}\n`;
 
@@ -182,16 +183,16 @@ export const useInputEvents = ({
         }\n`;
         log += `  Channel: ${String(data.channel)}\n`;
       }
-    } else if (source === "osc") {
+    } else if (source === "osc" || source === "audio") {
       const address = typeof data.address === "string" ? (data.address as string) : null;
       const identifier = typeof data.identifier === "string" ? (data.identifier as string) : null;
       const channelName =
         typeof data.channelName === "string" ? (data.channelName as string) : null;
       const value = data.value;
-      if (address) {
+      if (address && source === "osc") {
         log += `  Address: ${address}\n`;
       }
-      if (identifier) {
+      if (identifier && source === "osc") {
         log += `  Identifier: ${identifier}\n`;
       }
       if (channelName) {
@@ -380,6 +381,23 @@ export const useInputEvents = ({
                 }
               );
             } else if (source === "osc") {
+              const channelName =
+                typeof data.channelName === "string" ? (data.channelName as string) : null;
+              if (channelName) {
+                Object.entries(activeTrack.channelMappings as Record<string, unknown>).forEach(
+                  ([channelNumber, slotNumber]) => {
+                    const resolvedTrigger = resolveChannelTrigger(
+                      slotNumber,
+                      currentInputType,
+                      globalMappings
+                    );
+                    if (resolvedTrigger === channelName) {
+                      channelsToFlash.push(channelNumber);
+                    }
+                  }
+                );
+              }
+            } else if (source === "audio") {
               const channelName =
                 typeof data.channelName === "string" ? (data.channelName as string) : null;
               if (channelName) {

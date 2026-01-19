@@ -31,6 +31,8 @@ import { useDashboardProjectorSettings } from "./core/hooks/useDashboardProjecto
 import { useDashboardInputConfiguration } from "./core/hooks/useDashboardInputConfiguration";
 import { useWorkspaceModuleIntrospectionDrain } from "./core/hooks/useWorkspaceModuleIntrospectionDrain";
 import { useDashboardUpdateConfig } from "./core/hooks/useDashboardUpdateConfig";
+import { useDashboardAudioDevices } from "./core/hooks/useDashboardAudioDevices";
+import { useDashboardAudioCapture } from "./core/hooks/useDashboardAudioCapture";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 const Dashboard = () => {
@@ -150,6 +152,25 @@ const Dashboard = () => {
       invokeIPC,
       sendToProjector,
     });
+
+  const isAudioMode = inputConfig?.type === "audio" && userData?.config?.sequencerMode !== true;
+  const { devices: availableAudioDevices, refresh: refreshAudioDevices } = useDashboardAudioDevices(
+    Boolean(isAudioMode)
+  );
+  const emitAudioBand = useCallback(
+    async (payload) => invokeIPC("input:audio:emitBand", payload),
+    [invokeIPC]
+  );
+  const audioCaptureState = useDashboardAudioCapture({
+    enabled: Boolean(isAudioMode),
+    deviceId:
+      typeof inputConfig?.deviceId === "string" && inputConfig.deviceId ? inputConfig.deviceId : null,
+    emitBand: emitAudioBand,
+    thresholds:
+      inputConfig && typeof inputConfig === "object" ? inputConfig.audioThresholds || null : null,
+    minIntervalMs:
+      inputConfig && typeof inputConfig === "object" ? inputConfig.audioMinIntervalMs ?? null : null,
+  });
 
   useInputEvents({
     userData,
@@ -376,6 +397,9 @@ const Dashboard = () => {
         inputConfig={inputConfig}
         setInputConfig={setInputConfig}
         availableMidiDevices={availableMidiDevices}
+        availableAudioDevices={availableAudioDevices}
+        refreshAudioDevices={refreshAudioDevices}
+        audioCaptureState={audioCaptureState}
         settings={settings}
         aspectRatio={aspectRatio}
         setAspectRatio={setAspectRatio}

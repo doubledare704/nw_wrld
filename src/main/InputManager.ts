@@ -43,7 +43,12 @@ type RuntimeOscConfig = Omit<InputConfig, "type"> & {
   noteMatchMode?: string;
 };
 
-type RuntimeInputConfig = RuntimeMidiConfig | RuntimeOscConfig;
+type RuntimeAudioConfig = Omit<InputConfig, "type"> & {
+  type: "audio";
+  noteMatchMode?: string;
+};
+
+type RuntimeInputConfig = RuntimeMidiConfig | RuntimeOscConfig | RuntimeAudioConfig;
 
 type WindowWebContents = {
   isDestroyed(): boolean;
@@ -60,6 +65,7 @@ type WindowLike = {
 type CurrentSource =
   | { type: "midi"; instance: MidiInput }
   | { type: "osc"; instance: UDPPort }
+  | { type: "audio"; instance: { close?: () => unknown } }
   | null;
 
 type WebMidiProvider = {
@@ -252,6 +258,9 @@ class InputManager {
         case "osc":
           await this.initOSC(config as RuntimeOscConfig);
           break;
+        case "audio":
+          await this.initAudio(config as RuntimeAudioConfig);
+          break;
         default:
           console.warn("[InputManager] Unknown input type:", inputType);
           this.broadcastStatus(
@@ -441,6 +450,11 @@ class InputManager {
     }
   }
 
+  async initAudio(_audioConfig: RuntimeAudioConfig) {
+    this.currentSource = { type: "audio", instance: {} };
+    this.broadcastStatus(INPUT_STATUS.CONNECTED, "Audio (listening)");
+  }
+
   async disconnect() {
     try {
       if (this.currentSource) {
@@ -468,6 +482,13 @@ class InputManager {
           case "osc":
             if (this.currentSource.instance) {
               this.currentSource.instance.close();
+            }
+            break;
+          case "audio":
+            if (this.currentSource.instance && typeof this.currentSource.instance.close === "function") {
+              try {
+                this.currentSource.instance.close();
+              } catch {}
             }
             break;
         }

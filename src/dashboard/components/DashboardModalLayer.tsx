@@ -55,6 +55,14 @@ type DashboardModalLayerProps = {
   inputConfig: Record<string, unknown>;
   setInputConfig: (config: Record<string, unknown>) => void;
   availableMidiDevices: Array<{ id: string; name: string }>;
+  availableAudioDevices: Array<{ id: string; label: string }>;
+  refreshAudioDevices: () => Promise<void>;
+  audioCaptureState:
+    | { status: "idle" }
+    | { status: "starting" }
+    | { status: "running" }
+    | { status: "error"; message: string }
+    | { status: "mock" };
   settings: ProjectorSettings;
   aspectRatio: string;
   setAspectRatio: (ratio: string) => void;
@@ -133,6 +141,9 @@ export const DashboardModalLayer = ({
   inputConfig,
   setInputConfig,
   availableMidiDevices,
+  availableAudioDevices,
+  refreshAudioDevices,
+  audioCaptureState,
   settings,
   aspectRatio,
   setAspectRatio,
@@ -226,6 +237,9 @@ export const DashboardModalLayer = ({
         inputConfig={inputConfig}
         setInputConfig={setInputConfig}
         availableMidiDevices={availableMidiDevices}
+        availableAudioDevices={availableAudioDevices}
+        refreshAudioDevices={refreshAudioDevices}
+        audioCaptureState={audioCaptureState}
         onOpenMappings={() => {
           setIsSettingsModalOpen(false);
           setIsInputMappingsModalOpen(true);

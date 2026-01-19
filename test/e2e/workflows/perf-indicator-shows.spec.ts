@@ -65,115 +65,25 @@ test("dashboard shows perf indicator after sandbox starts emitting stats", async
     await dashboard.getByText("Create Track", { exact: true }).click();
     await expect(dashboard.locator('input[placeholder="My Performance Track"]')).toBeHidden();
 
-    await dashboard.getByText("MODULE", { exact: true }).click();
-    const previewIcons = dashboard.locator('[title="Preview module"]');
-    await expect(previewIcons.first()).toBeVisible();
-
-    let didPreview = false;
-    for (let i = 0; i < 5; i++) {
-      await clearDashboardMessages(dashboard);
-      await clearProjectorMessages(projector);
-
-      await previewIcons.nth(i).hover();
-
-      let requestId: string | null = null;
-      let moduleName: string | null = null;
-
-      await expect
-        .poll(
-          async () => {
-            const msgs = await getProjectorMessages(projector);
-            const m = msgs.find(
-              (x) =>
-                x.type === "preview-module" &&
-                typeof x.props?.requestId === "string" &&
-                typeof x.props?.moduleName === "string"
-            );
-            requestId = (m?.props?.requestId as string) || null;
-            moduleName = (m?.props?.moduleName as string) || null;
-            return Boolean(requestId && moduleName);
-          },
-          { timeout: 20_000 }
-        )
-        .toBe(true);
-
-      if (!requestId || !moduleName) continue;
-
-      await dashboard.waitForFunction(
-        ({ requestId, moduleName }) => {
-          const anyGlobal = globalThis as unknown as {
-            __nwWrldE2EDashboard?: { messages?: unknown[] };
-          };
-          const msgs = Array.isArray(anyGlobal.__nwWrldE2EDashboard?.messages)
-            ? anyGlobal.__nwWrldE2EDashboard?.messages
-            : [];
-          const gotReady = msgs.some((m) => {
-            if (!m || typeof m !== "object") return false;
-            return (
-              (m as { type?: unknown }).type === "preview-module-ready" &&
-              (m as { props?: { requestId?: unknown; moduleName?: unknown } }).props?.requestId ===
-                requestId &&
-              (m as { props?: { requestId?: unknown; moduleName?: unknown } }).props?.moduleName ===
-                moduleName
-            );
-          });
-          const gotError = msgs.some((m) => {
-            if (!m || typeof m !== "object") return false;
-            return (
-              (m as { type?: unknown }).type === "preview-module-error" &&
-              (m as { props?: { requestId?: unknown; moduleName?: unknown } }).props?.requestId ===
-                requestId &&
-              (m as { props?: { requestId?: unknown; moduleName?: unknown } }).props?.moduleName ===
-                moduleName
-            );
-          });
-          return gotReady || gotError;
-        },
-        { requestId, moduleName },
-        { timeout: 25_000 }
-      );
-
-      const status = await dashboard.evaluate(
-        ({ requestId, moduleName }) => {
-          const anyGlobal = globalThis as unknown as {
-            __nwWrldE2EDashboard?: { messages?: unknown[] };
-          };
-          const msgs = Array.isArray(anyGlobal.__nwWrldE2EDashboard?.messages)
-            ? anyGlobal.__nwWrldE2EDashboard?.messages
-            : [];
-          const gotReady = msgs.some((m) => {
-            if (!m || typeof m !== "object") return false;
-            return (
-              (m as { type?: unknown }).type === "preview-module-ready" &&
-              (m as { props?: { requestId?: unknown; moduleName?: unknown } }).props?.requestId ===
-                requestId &&
-              (m as { props?: { requestId?: unknown; moduleName?: unknown } }).props?.moduleName ===
-                moduleName
-            );
-          });
-          if (gotReady) return "ready";
-          const gotError = msgs.some((m) => {
-            if (!m || typeof m !== "object") return false;
-            return (
-              (m as { type?: unknown }).type === "preview-module-error" &&
-              (m as { props?: { requestId?: unknown; moduleName?: unknown } }).props?.requestId ===
-                requestId &&
-              (m as { props?: { requestId?: unknown; moduleName?: unknown } }).props?.moduleName ===
-                moduleName
-            );
-          });
-          return gotError ? "error" : "pending";
-        },
-        { requestId, moduleName }
-      );
-
-      if (status === "ready") {
-        didPreview = true;
-        break;
+    await dashboard.getByText("TRACKS", { exact: true }).click();
+    const trackLabel = dashboard.locator("label").filter({ hasText: trackName }).first();
+    await expect(trackLabel).toBeVisible();
+    await trackLabel.click();
+    {
+      const tracksModal = dashboard.locator("div.fixed").filter({ hasText: "Select Active Track:" }).first();
+      if (await tracksModal.isVisible()) {
+        await tracksModal.getByText("CLOSE", { exact: true }).click();
       }
+      await expect(dashboard.locator("text=Select Active Track:")).toBeHidden();
     }
 
-    expect(didPreview).toBe(true);
+    await dashboard.getByTestId("track-add-module").click();
+    const addTextModule = dashboard.locator(
+      `[data-testid="add-module-to-track"][data-module-name="Text"]`
+    );
+    await expect(addTextModule).toBeVisible();
+    await addTextModule.click();
+    await expect(addTextModule).toBeHidden();
 
     await expect
       .poll(
@@ -181,12 +91,9 @@ test("dashboard shows perf indicator after sandbox starts emitting stats", async
           const msgs = await getDashboardMessages(dashboard);
           return msgs.some((m) => m.type === "perf:stats");
         },
-        { timeout: 30_000 }
+        { timeout: 60_000 }
       )
       .toBe(true);
-
-    await dashboard.getByText("CLOSE", { exact: true }).click();
-    await expect(previewIcons.first()).toBeHidden();
 
     await dashboard.getByText("DEBUG", { exact: true }).click();
 

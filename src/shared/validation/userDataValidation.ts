@@ -134,6 +134,42 @@ export function sanitizeUserDataForBridge(
     out.config = isPlainObject(fallback.config) ? fallback.config : {};
   }
 
+  const cfg = out.config as Record<string, Jsonish>;
+  const fallbackCfg = isPlainObject(fallback.config)
+    ? (fallback.config as Record<string, Jsonish>)
+    : {};
+
+  const fallbackTrackMappings = isPlainObject(fallbackCfg.trackMappings)
+    ? (fallbackCfg.trackMappings as Record<string, Jsonish>)
+    : {};
+  if (!isPlainObject(cfg.trackMappings)) {
+    ensure();
+    cfg.trackMappings = fallbackTrackMappings;
+  } else {
+    const tm = cfg.trackMappings as Record<string, Jsonish>;
+    if (!isPlainObject(tm.audio)) {
+      ensure();
+      cfg.trackMappings = { ...tm, audio: {} };
+    }
+  }
+
+  const fallbackChannelMappings = isPlainObject(fallbackCfg.channelMappings)
+    ? (fallbackCfg.channelMappings as Record<string, Jsonish>)
+    : {};
+  if (!isPlainObject(cfg.channelMappings)) {
+    ensure();
+    cfg.channelMappings = fallbackChannelMappings;
+  } else {
+    const cm = cfg.channelMappings as Record<string, Jsonish>;
+    if (!isPlainObject(cm.audio)) {
+      const fallbackAudio = isPlainObject(fallbackChannelMappings.audio)
+        ? (fallbackChannelMappings.audio as Record<string, Jsonish>)
+        : {};
+      ensure();
+      cfg.channelMappings = { ...cm, audio: fallbackAudio };
+    }
+  }
+
   let setsRaw: Jsonish[] = [];
   if (isArray(out.sets)) {
     setsRaw = out.sets;

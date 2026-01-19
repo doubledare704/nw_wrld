@@ -37,7 +37,7 @@ export function normalizeInputEventPayload(
   const dataObj = data as DataBag;
 
   const source = dataObj.source;
-  if (source !== "midi" && source !== "osc") return null;
+  if (source !== "midi" && source !== "osc" && source !== "audio") return null;
 
   const timestamp = isFiniteNumber(dataObj.timestamp)
     ? dataObj.timestamp
@@ -58,6 +58,24 @@ export function normalizeInputEventPayload(
         timestamp,
         note,
         channel,
+        velocity,
+      },
+    };
+  }
+
+  if (source === "audio") {
+    if (type !== "method-trigger") return null;
+    if (!isNonEmptyString(dataObj.channelName)) return null;
+    if (!isFiniteNumber(dataObj.velocity)) return null;
+    const channelName = dataObj.channelName;
+    const velocity = dataObj.velocity;
+    return {
+      type,
+      data: {
+        ...dataObj,
+        source: "audio",
+        timestamp,
+        channelName,
         velocity,
       },
     };

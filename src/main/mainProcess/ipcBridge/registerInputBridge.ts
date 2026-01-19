@@ -18,5 +18,21 @@ export function registerInputBridge(): void {
   ipcMain.handle("input:get-midi-devices", async () => {
     return await InputManager.getAvailableMIDIDevices();
   });
+
+  ipcMain.handle("input:audio:emitBand", async (_event, payload: unknown) => {
+    const p = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
+    const channelName = p && typeof p.channelName === "string" ? p.channelName : "";
+    const velocity = p && typeof p.velocity === "number" ? p.velocity : NaN;
+    if (!channelName) return { ok: false };
+    if (!Number.isFinite(velocity)) return { ok: false };
+    if (!state.inputManager) return { ok: false };
+    const im = state.inputManager as InputManager;
+    const cfg = (im as unknown as { config?: unknown }).config;
+    const cfgObj = cfg && typeof cfg === "object" ? (cfg as Record<string, unknown>) : null;
+    const currentType = cfgObj && typeof cfgObj.type === "string" ? cfgObj.type : "";
+    if (currentType !== "audio") return { ok: false };
+    im.broadcast("method-trigger", { source: "audio", channelName, velocity });
+    return { ok: true };
+  });
 }
 

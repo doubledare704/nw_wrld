@@ -37,6 +37,11 @@ export const useIPCInvoke = () => {
         ? await messaging.getMidiDevices()
         : null;
     }
+    if (channel === "input:audio:emitBand") {
+      return typeof (messaging as unknown as { emitAudioBand?: unknown }).emitAudioBand === "function"
+        ? await (messaging as unknown as { emitAudioBand: (payload: unknown) => Promise<unknown> }).emitAudioBand(args[0])
+        : null;
+    }
     if (channel === "workspace:select") {
       return typeof messaging.selectWorkspace === "function"
         ? await messaging.selectWorkspace()
