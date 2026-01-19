@@ -17,16 +17,17 @@ This project is currently in beta. Downloadable installers are not currently pro
 
 - [x] Isolated sandbox and module-workspace bundling
 - [x] Docblock-declared module dependencies with automated runtime injection
-- [ ] TypeScript migration
-- [ ] Signed and notarized macOS builds +
-- [ ] signed Windows builds for frictionless installs
-- [ ] Linux support
-- [ ] Userdata and module versioning (plus migration scripts)
+- [x] TypeScript migration
+- [x] Unit tests, E2E Playwright tests, runtime validations
+- [ ] Use-case specific User Guides (Ableton, strudel, TouchDesigner, etc.)
+- [ ] Signed and notarized MacOS app builds
+- [ ] Signed Windows app builds
+- [ ] Robust Linux & WSL support
+- [ ] Userdata, Module, and JSON versioning (+ migration scripts)
 - [ ] Multi-band audio threshold analysis (local processing) for channel triggers
 - [ ] Advanced default sequencer (Working sampler with audio FX)
 - [ ] Remote API input source with HTTP/WebSocket client for cloud-based services (audio analysis APIs, ML models, etc.)
 - [ ] Serial port input support for hardware sensor integration
-- [ ] JSON versioning (and migration scripts)
 
 ## Features
 
