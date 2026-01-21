@@ -94,12 +94,15 @@ export class BaseThreeJsModule extends ModuleBase {
     
     {
       name: "displacementParams",
-      executeOnLoad: true,
+      executeOnLoad: false,
       options: [
         {
           name: "amplitude",
-          defaultVal: 0,
+          defaultVal: 1,
           type: "number",
+          min: 0,
+          max: 50,
+          allowRandomization: true,
         },
         {
           name: "oscTime",
@@ -107,21 +110,31 @@ export class BaseThreeJsModule extends ModuleBase {
           type: "number",
           min: 0.01,
           max: 10,
+          allowRandomization: true,
         },
         {
           name: "x",
           defaultVal: 1,
           type: "number",
+          min: -5,
+          max: 5,
+          allowRandomization: true,
         },
         {
           name: "y",
           defaultVal: 1,
           type: "number",
+          min: -5,
+          max: 5,
+          allowRandomization: true,
         },
         {
           name: "z",
           defaultVal: 1,
           type: "number",
+          min: -5,
+          max: 5,
+          allowRandomization: true,
         },
       ],
     },
@@ -205,6 +218,8 @@ export class BaseThreeJsModule extends ModuleBase {
       t: 0,        // accumulated time
       speed: 1.0,  // higher = faster return from B back to A
     };
+
+    this.lastDisplacementNow = null;
   }
 
   /**
@@ -218,7 +233,7 @@ export class BaseThreeJsModule extends ModuleBase {
     }
 
     // Add the model to the scene
-    this.model = model;        // ← ADD THIS LINE
+    this.model = model;
     this.scene.add(model);
 
     // Compute bounding box, center, and size
@@ -283,12 +298,17 @@ export class BaseThreeJsModule extends ModuleBase {
     this.updateCameraAnimation();
 
     // Advance displacement-local time once per animation frame
-    this.displacementTime.t += 0.016 * this.displacementTime.speed;
+    const now = performance.now();
+    if (this.lastDisplacementNow === null) this.lastDisplacementNow = now;
+    const dt = (now - this.lastDisplacementNow) / 1000;
+    this.lastDisplacementNow = now;
+    const safeDt = Math.min(Math.max(dt, 0), 0.1);
+    this.displacementTime.t += safeDt * this.displacementTime.speed;
 
     // Applies geometry displacement each frame for all geometries contained in the current model.
     if (this.model) {
       this.model.traverse((obj) => {
-        if (obj.geometry) {
+        if (obj.geometry && obj.geometry.isBufferGeometry) {
           this.saveBaseGeometry(obj.geometry);
           this.applyDisplacement(obj.geometry);
         }
@@ -339,31 +359,42 @@ export class BaseThreeJsModule extends ModuleBase {
     const pos = geometry?.attributes?.position;
     if (!pos) return;
 
-    if (!geometry.userData.basePositions) {
+    if (pos.isInterleavedBufferAttribute) return;
+
+    if (!geometry.userData.basePositions || geometry.userData.basePositions.length !== pos.array.length) {
       geometry.userData.basePositions = pos.array.slice();
     }
-  }
-    /**
-     * Math tools for applyDisplacement so that not all vertices move uniform
-     */
-    hash01(i) {
-      // deterministic 0..1 from an integer
-      const x = Math.sin(i * 127.1 + 311.7) * 43758.5453123;
-      return x - Math.floor(x);
-    }
 
-    deterministicGaussian(i) {
-      // approx gaussian by summing uniforms (deterministic)
-      // 6 uniforms -> roughly normal(0,1) after centering
-      let s = 0;
-      s += this.hash01(i * 1 + 17);
-      s += this.hash01(i * 2 + 29);
-      s += this.hash01(i * 3 + 43);
-      s += this.hash01(i * 4 + 61);
-      s += this.hash01(i * 5 + 83);
-      s += this.hash01(i * 6 + 101);
-      return (s - 3.0); // centered around 0
+    if (
+      !geometry.userData.displacementNoise ||
+      geometry.userData.displacementNoise.length !== pos.count
+    ) {
+      const noise = new Float32Array(pos.count);
+      for (let i = 0; i < pos.count; i++) {
+        noise[i] = this.deterministicGaussian(i);
+      }
+      geometry.userData.displacementNoise = noise;
     }
+  }
+
+  hash01(i) {
+    // deterministic 0..1 from an integer
+    const x = Math.sin(i * 127.1 + 311.7) * 43758.5453123;
+    return x - Math.floor(x);
+  }
+
+  deterministicGaussian(i) {
+    // approx gaussian by summing uniforms (deterministic)
+    // 6 uniforms -> roughly normal(0,1) after centering
+    let s = 0;
+    s += this.hash01(i * 1 + 17);
+    s += this.hash01(i * 2 + 29);
+    s += this.hash01(i * 3 + 43);
+    s += this.hash01(i * 4 + 61);
+    s += this.hash01(i * 5 + 83);
+    s += this.hash01(i * 6 + 101);
+    return s - 3.0;
+  }
 
   /**
    * Applies displacement to a geometry based on the current displacement state.
@@ -375,7 +406,10 @@ export class BaseThreeJsModule extends ModuleBase {
 
     const pos = geometry?.attributes?.position;
     const base = geometry?.userData?.basePositions;
+    const noise = geometry?.userData?.displacementNoise;
     if (!pos || !base) return;
+    if (pos.isInterleavedBufferAttribute) return;
+    if (!noise || noise.length !== pos.count) return;
 
     const amp = Number(this.displacement.amplitude) || 0;
     const v = this.displacement.vector;
@@ -395,7 +429,7 @@ export class BaseThreeJsModule extends ModuleBase {
       const i3 = i * 3;
 
       // per-vertex deterministic "gaussian-like" offset
-      const g = this.deterministicGaussian(i) * amp;
+      const g = noise[i] * amp;
 
       // replicate DisplaceGeometry’s “add same g to x,y,z” warp,
       // but keep your vector as a directional scaler
@@ -663,8 +697,9 @@ export class BaseThreeJsModule extends ModuleBase {
    * @param {Object} options - Configuration options.
    */
   displacementAmplitude({ amplitude = 0 } = {}) {
-    this.displacement.amplitude = amplitude;
-    this.displacement.enabled = amplitude !== 0;
+    const amp = Number(amplitude) || 0;
+    this.displacement.amplitude = amp;
+    this.displacement.enabled = amp !== 0;
 
     // Reset displacement time when effect is disabled to avoid phase jumps
     if (amplitude === 0 && this.displacementTime) {
@@ -677,7 +712,11 @@ export class BaseThreeJsModule extends ModuleBase {
    * These values scale the global amplitude independently on X, Y, and Z.
    */
   displacementVector({ x = 1, y = 1, z = 1 } = {}) {
-    this.displacement.vector.set(x, y, z);
+    this.displacement.vector.set(
+      Number(x) || 1,
+      Number(y) || 1,
+      Number(z) || 1
+    );
   }
 
   /**
@@ -686,19 +725,25 @@ export class BaseThreeJsModule extends ModuleBase {
    */
   displacementParams({ amplitude = 0, oscTime = 1.0, x = 1, y = 1, z = 1 } = {}) {
     // amplitude + enable
-    this.displacement.amplitude = amplitude;
-    this.displacement.enabled = amplitude !== 0;
+    const amp = Number(amplitude) || 0;
+    this.displacement.amplitude = amp;
+    this.displacement.enabled = amp !== 0;
 
     // direction
-    this.displacement.vector.set(x, y, z);
+    this.displacement.vector.set(
+      Number(x) || 1,
+      Number(y) || 1,
+      Number(z) || 1
+    );
 
     // oscillate speed (time factor)
     if (this.displacementTime) {
-      this.displacementTime.speed = oscTime;
+      const safeSpeed = Number(oscTime);
+      this.displacementTime.speed = Number.isFinite(safeSpeed) ? safeSpeed : 1.0;
     }
 
     // reset time when disabled
-    if (amplitude === 0 && this.displacementTime) {
+    if (amp === 0 && this.displacementTime) {
       this.displacementTime.t = 0;
     }
   }
