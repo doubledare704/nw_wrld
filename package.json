@@ -134,13 +134,29 @@
       "src/assets/**",
       "!**/node_modules/**/prebuilds/android-*/**",
       "!**/node_modules/**/prebuilds/linux-*/**",
-      "!**/node_modules/**/prebuilds/win32-*/**"
+      "!**/node_modules/**/prebuilds/win32-ia32/**"
     ],
     "mac": {
       "target": [
         "dmg"
       ],
       "icon": "build/logo.icns",
+      "files": [
+        "index.js",
+        "package.json",
+        "dist/**",
+        "src/index.js",
+        "src/main/**",
+        "src/projector/helpers/**",
+        "src/projector/views/**",
+        "src/dashboard/views/**",
+        "src/dashboard/assets/audio/**",
+        "src/shared/**",
+        "src/assets/**",
+        "!**/node_modules/**/prebuilds/android-*/**",
+        "!**/node_modules/**/prebuilds/linux-*/**",
+        "!**/node_modules/**/prebuilds/win32-*/**"
+      ],
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.inherit.plist",
@@ -150,7 +166,7 @@
       "target": [
         "portable"
       ],
-      "icon": "build/logo.ico"
+      "icon": "build/logo.png"
     }
   }
 }
