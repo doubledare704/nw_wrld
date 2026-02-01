@@ -10,11 +10,6 @@ export async function launchNwWrld({
 }): Promise<ElectronApplication> {
   const repoRoot = path.join(__dirname, "..", "..", "..");
   const appPath = path.join(repoRoot, "src");
-  const defaultTestUserDataDir = `${projectDir}-userData`;
-  const testUserDataDir =
-    typeof env?.NW_WRLD_TEST_USER_DATA_DIR === "string" && env.NW_WRLD_TEST_USER_DATA_DIR.trim()
-      ? env.NW_WRLD_TEST_USER_DATA_DIR.trim()
-      : defaultTestUserDataDir;
 
   return await electron.launch({
     executablePath: require("electron") as string,
@@ -23,7 +18,6 @@ export async function launchNwWrld({
       ...process.env,
       NODE_ENV: "test",
       NW_WRLD_TEST_PROJECT_DIR: projectDir,
-      NW_WRLD_TEST_USER_DATA_DIR: testUserDataDir,
       ...(env || {}),
     },
   });
