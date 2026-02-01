@@ -39,10 +39,7 @@ const SortableSetItem = ({
     <SortableWrapper id={set.id}>
       {({ dragHandleProps, isDragging: _isDragging }) => (
         <div className="flex items-center gap-3 py-2">
-          <span
-            className="text-neutral-300 cursor-move text-md"
-            {...dragHandleProps}
-          >
+          <span className="text-neutral-300 cursor-move text-md" {...dragHandleProps}>
             {"\u2261"}
           </span>
           <RadioButton
@@ -54,9 +51,7 @@ const SortableSetItem = ({
           <label
             htmlFor={`set-${set.id}`}
             className={`uppercase cursor-pointer text-[11px] font-mono flex-1 ${
-              activeSetId === set.id
-                ? "text-neutral-300"
-                : "text-neutral-300/30"
+              activeSetId === set.id ? "text-neutral-300" : "text-neutral-300/30"
             }`}
           >
             {set.name} ({set.tracks.length} tracks)
@@ -127,8 +122,7 @@ export const SelectSetModal = ({
 
     const newSet = sets.find((s) => s.id === setId);
     if (newSet && newSet.tracks.length > 0) {
-      const firstTrack =
-        newSet.tracks.find((t) => t.isVisible) || newSet.tracks[0];
+      const firstTrack = newSet.tracks.find((t) => t.isVisible) || newSet.tracks[0];
       setActiveTrackId(firstTrack.id);
     } else {
       setActiveTrackId(null);
@@ -146,40 +140,34 @@ export const SelectSetModal = ({
     const setToDelete = sets.find((s) => s.id === setId);
     if (!setToDelete) return;
 
-    onConfirmDelete(
-      `Are you sure you want to delete "${setToDelete.name}"?`,
-      () => {
-        const trackIdsToDelete = setToDelete.tracks.map((t) => t.id);
+    onConfirmDelete(`Are you sure you want to delete "${setToDelete.name}"?`, () => {
+      const trackIdsToDelete = setToDelete.tracks.map((t) => t.id);
 
-        updateUserData(setUserData, (draft) => {
-          const d = draft as unknown as UserData;
-          d.sets = d.sets.filter((s) => s.id !== setId);
-        });
+      updateUserData(setUserData, (draft) => {
+        const d = draft as unknown as UserData;
+        d.sets = d.sets.filter((s) => s.id !== setId);
+      });
 
-        if (trackIdsToDelete.length > 0) {
-          setRecordingData((prev) =>
-            deleteRecordingsForTracks(prev, trackIdsToDelete.map(String))
-          );
-        }
+      if (trackIdsToDelete.length > 0) {
+        setRecordingData((prev) => deleteRecordingsForTracks(prev, trackIdsToDelete.map(String)));
+      }
 
-        if (activeSetId === setId) {
-          const newSet = sets.find((s) => s.id !== setId);
-          if (newSet) {
-            setActiveSetId(newSet.id);
-            if (newSet.tracks.length > 0) {
-              const firstTrack =
-                newSet.tracks.find((t) => t.isVisible) || newSet.tracks[0];
-              setActiveTrackId(firstTrack.id);
-            } else {
-              setActiveTrackId(null);
-            }
+      if (activeSetId === setId) {
+        const newSet = sets.find((s) => s.id !== setId);
+        if (newSet) {
+          setActiveSetId(newSet.id);
+          if (newSet.tracks.length > 0) {
+            const firstTrack = newSet.tracks.find((t) => t.isVisible) || newSet.tracks[0];
+            setActiveTrackId(firstTrack.id);
           } else {
-            setActiveSetId(null);
             setActiveTrackId(null);
           }
+        } else {
+          setActiveSetId(null);
+          setActiveTrackId(null);
         }
       }
-    );
+    });
   };
 
   return (
@@ -187,7 +175,7 @@ export const SelectSetModal = ({
       <Modal isOpen={isOpen} onClose={onClose} size="small">
         <ModalHeader title="SETS" onClose={onClose} />
 
-        <div className="px-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <div>
             <div className="pl-6">
               <div className="opacity-50 text-[11px] mb-1 font-mono">Select Active Set:</div>

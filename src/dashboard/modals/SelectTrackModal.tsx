@@ -186,7 +186,7 @@ export const SelectTrackModal = ({
       <Modal isOpen={isOpen} onClose={onClose} size="small">
         <ModalHeader title="TRACKS" onClose={onClose} />
 
-        <div className="px-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <div>
             <div className="pl-6">
               <div className="opacity-50 text-[11px] mb-1 font-mono">Select Active Track:</div>
