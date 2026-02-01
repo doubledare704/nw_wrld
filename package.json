@@ -51,7 +51,7 @@
     "three-js",
     "p5-js"
   ],
-  "author": "https://github.com/aagentah",
+  "author": "aagentah <daniel@aagentah.tech> (https://github.com/aagentah)",
   "license": "GPL-3.0",
   "repository": {
     "type": "git",
