@@ -32,7 +32,9 @@
     "dist:mac:arm64": "npm run build:renderer && electron-builder --mac --arm64 --publish never",
     "dist:mac:x64": "npm run build:renderer && electron-builder --mac --x64 --publish never",
     "pack:win": "npm run build:renderer && electron-builder --win --dir",
-    "dist:win": "npm run build:renderer && electron-builder --win --publish never"
+    "dist:win": "npm run build:renderer && electron-builder --win --publish never",
+    "pack:linux": "npm run build:renderer && electron-builder --linux --dir",
+    "dist:linux": "npm run build:renderer && electron-builder --linux --publish never"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -133,7 +135,6 @@
       "src/shared/**",
       "src/assets/**",
       "!**/node_modules/**/prebuilds/android-*/**",
-      "!**/node_modules/**/prebuilds/linux-*/**",
       "!**/node_modules/**/prebuilds/win32-ia32/**"
     ],
     "mac": {
@@ -166,7 +167,30 @@
       "target": [
         "portable"
       ],
-      "icon": "build/logo.ico"
+      "icon": "build/logo.ico",
+      "files": [
+        "index.js",
+        "package.json",
+        "dist/**",
+        "src/index.js",
+        "src/main/**",
+        "src/projector/helpers/**",
+        "src/projector/views/**",
+        "src/dashboard/views/**",
+        "src/dashboard/assets/audio/**",
+        "src/shared/**",
+        "src/assets/**",
+        "!**/node_modules/**/prebuilds/android-*/**",
+        "!**/node_modules/**/prebuilds/linux-*/**",
+        "!**/node_modules/**/prebuilds/win32-ia32/**"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/logo.png"
     }
   }
 }
