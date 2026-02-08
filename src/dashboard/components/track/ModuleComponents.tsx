@@ -20,7 +20,7 @@ import {
   parsePitchClass,
   pitchClassToName,
 } from "../../../shared/midi/midiUtils";
-import { FaExclamationTriangle, FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaEdit, FaExclamationTriangle, FaEye, FaEyeSlash } from "react-icons/fa";
 import { Tooltip } from "../Tooltip";
 
 type Track = {
@@ -53,13 +53,11 @@ type ModuleSelectorProps = {
   stopPlayback: () => void;
   onShowTrackData: (track: unknown) => void;
   inputConfig: { type?: string } | null;
+  onEditTrack?: () => void;
 };
 
 export const ModuleSelector = memo(
-  ({
-    trackIndex,
-    inputConfig,
-  }: ModuleSelectorProps) => {
+  ({ trackIndex, inputConfig, onEditTrack }: ModuleSelectorProps) => {
     const [userData] = useAtom(userDataAtom);
     const [activeSetId] = useAtom(activeSetIdAtom);
     const tracks = getActiveSetTracks(userData, activeSetId) as unknown as Track[];
@@ -72,7 +70,8 @@ export const ModuleSelector = memo(
       if (resolvedTrigger === "" || resolvedTrigger === null || resolvedTrigger === undefined) {
         return resolvedTrigger;
       }
-      const pc = typeof resolvedTrigger === "number" ? resolvedTrigger : parsePitchClass(resolvedTrigger);
+      const pc =
+        typeof resolvedTrigger === "number" ? resolvedTrigger : parsePitchClass(resolvedTrigger);
       if (pc === null) return resolvedTrigger;
       const name = pitchClassToName(pc);
       return name || String(pc);
@@ -81,7 +80,18 @@ export const ModuleSelector = memo(
 
     return (
       <div className="font-mono flex flex-col justify-between mb-4">
-        <div className="mb-4 flex items-center gap-2">
+        <div className="mb-4 pl-2 flex items-center gap-2">
+          {onEditTrack && (
+            <button
+              type="button"
+              className="text-neutral-500 hover:text-neutral-300 text-[11px] transition-colors"
+              onClick={onEditTrack}
+              data-testid="dashboard-edit-track"
+              aria-label="Edit track"
+            >
+              <FaEdit />
+            </button>
+          )}
           <span className="text-sm text-neutral-500">
             <span>[TRACK]</span>{" "}
             <span className="">
@@ -412,44 +422,10 @@ export const NoteSelector = memo(
         }
       });
     }, [setUserData, activeSetId, trackIndex, instanceId, isDisabled]);
-    
+
     return (
       <div className={`px-12 font-mono ${isDisabled ? "opacity-50" : ""}`}>
-        <div className="mb-2 flex flex-wrap items-center justify-between">
-          <span
-            className={`text-sm ${
-              moduleInstance.disabled === true
-                ? "text-neutral-500/50 line-through"
-                : "text-neutral-500"
-            }`}
-          >
-            <span>[MODULE]</span> {moduleType}
-            {moduleWarningText ? (
-              <span className="ml-2 inline-flex items-center">
-                <Tooltip content={moduleWarningText} position="top">
-                  <span
-                    className="text-red-500/70 text-[11px] cursor-help"
-                    data-testid="workspace-module-warning"
-                    data-warning={isLoadFailed ? "load-failed" : isFileMissing ? "missing-file" : "unknown"}
-                    data-module-type={moduleType}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      try {
-                        (
-                          globalThis as unknown as {
-                            nwWrldBridge?: { app?: { openProjectorDevTools?: () => void } };
-                          }
-                        )?.nwWrldBridge?.app?.openProjectorDevTools?.();
-                      } catch {}
-                    }}
-                  >
-                    <FaExclamationTriangle />
-                  </span>
-                </Tooltip>
-              </span>
-            ) : null}
-          </span>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2">
             {dragHandleProps && (
               <span
@@ -468,7 +444,10 @@ export const NoteSelector = memo(
               onClick={(e) => {
                 e.stopPropagation();
                 toggleDisabled();
-                if (typeof (e as unknown as { detail?: number }).detail === "number" && (e as unknown as { detail?: number }).detail > 0) {
+                if (
+                  typeof (e as unknown as { detail?: number }).detail === "number" &&
+                  (e as unknown as { detail?: number }).detail > 0
+                ) {
                   e.currentTarget.blur();
                 }
               }}
@@ -502,10 +481,48 @@ export const NoteSelector = memo(
               </div>
             )}
           </div>
+          <span
+            className={`text-sm ${
+              moduleInstance.disabled === true
+                ? "text-neutral-500/50 line-through"
+                : "text-neutral-500"
+            }`}
+          >
+            <span>[MODULE]</span> {moduleType}
+            {moduleWarningText ? (
+              <span className="ml-2 inline-flex items-center">
+                <Tooltip content={moduleWarningText} position="top">
+                  <span
+                    className="text-red-500/70 text-[11px] cursor-help"
+                    data-testid="workspace-module-warning"
+                    data-warning={
+                      isLoadFailed ? "load-failed" : isFileMissing ? "missing-file" : "unknown"
+                    }
+                    data-module-type={moduleType}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      try {
+                        (
+                          globalThis as unknown as {
+                            nwWrldBridge?: { app?: { openProjectorDevTools?: () => void } };
+                          }
+                        )?.nwWrldBridge?.app?.openProjectorDevTools?.();
+                      } catch {}
+                    }}
+                  >
+                    <FaExclamationTriangle />
+                  </span>
+                </Tooltip>
+              </span>
+            ) : null}
+          </span>
         </div>
         <div className="">
           <div className="pl-12 flex flex-col gap-0">
-            <div className={`flex items-center p-0 ${isConstructorSelected ? "bg-white/5" : "bg-transparent"}`}>
+            <div
+              className={`flex items-center p-0 ${isConstructorSelected ? "bg-white/5" : "bg-transparent"}`}
+            >
               <div
                 className={`uppercase w-[140px] pr-4 text-[11px] flex items-center gap-2 cursor-pointer ${
                   flashingConstructors.has(`${track.id}:${instanceId}`)
@@ -555,7 +572,11 @@ export const NoteSelector = memo(
                 >
                   <div
                     className={`w-[140px] pr-4 text-[11px] font-mono flex items-center gap-2 cursor-pointer ${
-                      isFlashing ? "text-red-500" : isSelected ? "text-neutral-300" : "text-neutral-300"
+                      isFlashing
+                        ? "text-red-500"
+                        : isSelected
+                          ? "text-neutral-300"
+                          : "text-neutral-300"
                     }`}
                     data-testid="module-channel-config"
                     data-module-instance-id={instanceId}
@@ -586,21 +607,22 @@ export const NoteSelector = memo(
                         return `Channel ${channel.number}`;
                       }
                       if (currentInputType === "midi") {
-                        const noteMatchMode =
-                          (() => {
-                            const inputRaw = isPlainObject(globalMappings)
-                              ? (globalMappings as Record<string, unknown>).input
-                              : null;
-                            const mode =
-                              isPlainObject(inputRaw) && inputRaw.noteMatchMode === "exactNote"
-                                ? "exactNote"
-                                : "pitchClass";
-                            return mode;
-                          })();
+                        const noteMatchMode = (() => {
+                          const inputRaw = isPlainObject(globalMappings)
+                            ? (globalMappings as Record<string, unknown>).input
+                            : null;
+                          const mode =
+                            isPlainObject(inputRaw) && inputRaw.noteMatchMode === "exactNote"
+                              ? "exactNote"
+                              : "pitchClass";
+                          return mode;
+                        })();
                         if (noteMatchMode === "exactNote") {
                           const label = String(resolvedChannelTrigger ?? "").trim();
                           return label ? (
-                            <span className={isFlashing ? "text-red-500" : "text-blue-500"}>{label}</span>
+                            <span className={isFlashing ? "text-red-500" : "text-blue-500"}>
+                              {label}
+                            </span>
                           ) : (
                             `Channel ${channel.number}`
                           );
@@ -612,7 +634,9 @@ export const NoteSelector = memo(
                             : parsePitchClass(resolvedChannelTrigger);
                         const name = pc !== null ? pitchClassToName(pc) : null;
                         return name ? (
-                          <span className={isFlashing ? "text-red-500" : "text-blue-500"}>{name}</span>
+                          <span className={isFlashing ? "text-red-500" : "text-blue-500"}>
+                            {name}
+                          </span>
                         ) : (
                           `Channel ${channel.number}`
                         );
@@ -629,14 +653,21 @@ export const NoteSelector = memo(
                       <div className="flex gap-0.5 items-center" style={{ height: rowHeight }}>
                         {Array.from({ length: 16 }).map((_, stepIndex) => {
                           const channelKey = String(channel.number);
-                          const sequencerData = getSequencerForTrack(recordingData, String(track.id));
+                          const sequencerData = getSequencerForTrack(
+                            recordingData,
+                            String(track.id)
+                          );
                           const patternRaw = isPlainObject(sequencerData)
                             ? (sequencerData as Record<string, unknown>).pattern
                             : null;
-                          const pattern = isPlainObject(patternRaw) ? (patternRaw as Record<string, unknown>) : {};
+                          const pattern = isPlainObject(patternRaw)
+                            ? (patternRaw as Record<string, unknown>)
+                            : {};
                           const channelPattern = pattern[channelKey] || [];
-                          const isActive = Array.isArray(channelPattern) && channelPattern.includes(stepIndex);
-                          const isCurrentStep = isSequencerPlaying && sequencerCurrentStep === stepIndex;
+                          const isActive =
+                            Array.isArray(channelPattern) && channelPattern.includes(stepIndex);
+                          const isCurrentStep =
+                            isSequencerPlaying && sequencerCurrentStep === stepIndex;
 
                           return (
                             <button
@@ -669,7 +700,9 @@ export const NoteSelector = memo(
                       </div>
                     ) : (
                       <svg
-                        ref={(ref) => ref && visualizeChannel(channel, ref, trackDuration, moduleData)}
+                        ref={(ref) =>
+                          ref && visualizeChannel(channel, ref, trackDuration, moduleData)
+                        }
                         className="w-full"
                         style={{ height: rowHeight }}
                       ></svg>
@@ -746,4 +779,3 @@ export const SortableModuleItem = memo(
     );
   }
 );
-

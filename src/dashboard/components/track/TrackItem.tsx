@@ -16,6 +16,7 @@ import { getRecordingForTrack } from "../../../shared/json/recordingUtils";
 import MidiPlayback from "../../../shared/midi/midiPlayback";
 import { Button } from "../Button";
 import { TrackDataModal } from "../../modals/TrackDataModal";
+import { EditTrackModal } from "../../modals/EditTrackModal";
 import { ModuleSelector, SortableModuleItem } from "./ModuleComponents";
 
 type ModuleInstance = { id: string; type: string };
@@ -78,6 +79,7 @@ export const TrackItem = memo(
     const [_flashingChannels, flashChannel] = useFlashingChannels();
     const [_flashingConstructors, setFlashingConstructors] = useAtom(flashingConstructorsAtom);
     const [selectedTrackForData, setSelectedTrackForData] = useState<unknown | null>(null);
+    const [isEditTrackModalOpen, setIsEditTrackModalOpen] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const playbackEngineRef = useRef<MidiPlayback | null>(null);
 
@@ -244,6 +246,7 @@ export const TrackItem = memo(
                 setSelectedTrackForData(t);
               }}
               inputConfig={inputConfig}
+              onEditTrack={() => setIsEditTrackModalOpen(true)}
             />
             {track.modules.length > 0 && (
               <div className="absolute left-[11px] bottom-0 w-[2px] bg-neutral-800 h-4" />
@@ -340,6 +343,13 @@ export const TrackItem = memo(
           isOpen={!!selectedTrackForData}
           onClose={() => setSelectedTrackForData(null)}
           trackData={selectedTrackForData}
+        />
+
+        <EditTrackModal
+          isOpen={isEditTrackModalOpen}
+          onClose={() => setIsEditTrackModalOpen(false)}
+          trackIndex={trackIndex}
+          inputConfig={inputConfig as { type?: unknown; noteMatchMode?: unknown } | null}
         />
       </div>
     );

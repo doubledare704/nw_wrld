@@ -779,7 +779,7 @@ export const SettingsModal = ({
 
                     {normalizedInputType === "audio" && (
                       <>
-                        <div className="pl-6">
+                        <div className="pl-6 pb-4">
                           <div className="opacity-50 mb-1 text-[11px]">Audio Input Device:</div>
                           <div className="flex items-center gap-2">
                             <Select
@@ -821,14 +821,14 @@ export const SettingsModal = ({
                         </div>
 
                         <div className="pl-6">
-                          <div className="text-[10px] opacity-50">
+                          <div className="text-[10px] opacity-50 pb-4">
                             Status:{" "}
                             {audioCaptureState.status === "error"
                               ? `Error: ${audioCaptureState.message}`
                               : audioCaptureState.status}
                           </div>
-                          <div className="mt-2 text-[10px] opacity-50">
-                            Cooldown and thresholds are configured per track in Tracks → Edit Track.
+                          <div className="pb-4 text-[10px] opacity-50">
+                            Per-track audio is handled via the Edit Track modal.
                           </div>
                           <div className="text-[10px] opacity-50">
                             For system audio, use a loopback/virtual device and select it here.
@@ -841,19 +841,11 @@ export const SettingsModal = ({
                       <>
                         <div className="pl-6">
                           <div className="text-[10px] opacity-50">
-                            File upload, cooldown, and thresholds are configured per track in Tracks
-                            → Edit Track.
+                            Per-track audio is handled via the Edit Track modal.
                           </div>
                         </div>
                       </>
                     )}
-
-                    <div className="pl-6">
-                      <div className="opacity-50 mb-1 text-[11px]">Global Input Mappings:</div>
-                      <Button onClick={onOpenMappings} className="w-full">
-                        CONFIGURE MAPPINGS
-                      </Button>
-                    </div>
                   </>
                 )}
 
@@ -876,6 +868,15 @@ export const SettingsModal = ({
                 )}
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="pl-6 flex flex-col gap-2 font-mono">
+          <div className="opacity-50 mb-1 text-[11px]">Global Input Mappings:</div>
+          <div className="pl-6">
+            <Button onClick={onOpenMappings} className="w-full">
+              CONFIGURE MAPPINGS
+            </Button>
           </div>
         </div>
 
