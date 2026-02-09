@@ -2,15 +2,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 
-const { initWorkspaceModulesChangedListener } = require(path.join(
-  __dirname,
-  "..",
-  "dist",
-  "runtime",
-  "projector",
-  "internal",
-  "workspaceEvents.js"
-));
+const { initWorkspaceModulesChangedListener } = require(
+  path.join(__dirname, "..", "dist", "runtime", "projector", "internal", "workspaceEvents.js")
+);
 
 test("workspaceEvents: modulesChanged reloads active track or lastRequestedTrackName", () => {
   const prevBridge = globalThis.nwWrldBridge;
@@ -84,11 +78,13 @@ test("workspaceEvents: modulesChanged defers reload while isLoadingTrack", () =>
 
     let deactivateCalls = 0;
     let selectCalls = 0;
+    const sandboxHost = { destroy: () => {} };
+    const trackSources = { some: "sources" };
     const ctx = {
       workspaceModuleSourceCache: new Map([["Example", 123]]),
       assetsBaseUrl: "not-null",
-      trackSandboxHost: { destroy: () => {} },
-      trackModuleSources: { some: "sources" },
+      trackSandboxHost: sandboxHost,
+      trackModuleSources: trackSources,
       activeTrack: { name: "Track Loading" },
       lastRequestedTrackName: null,
       isLoadingTrack: true,
@@ -107,8 +103,8 @@ test("workspaceEvents: modulesChanged defers reload while isLoadingTrack", () =>
     handler();
     assert.equal(ctx.workspaceModuleSourceCache.size, 0);
     assert.equal(ctx.assetsBaseUrl, null);
-    assert.equal(ctx.trackSandboxHost, null);
-    assert.equal(ctx.trackModuleSources, null);
+    assert.equal(ctx.trackSandboxHost, sandboxHost);
+    assert.equal(ctx.trackModuleSources, trackSources);
     assert.equal(ctx.pendingWorkspaceReload, true);
     assert.equal(deactivateCalls, 0);
     assert.equal(selectCalls, 0);
@@ -116,4 +112,3 @@ test("workspaceEvents: modulesChanged defers reload while isLoadingTrack", () =>
     globalThis.nwWrldBridge = prevBridge;
   }
 });
-

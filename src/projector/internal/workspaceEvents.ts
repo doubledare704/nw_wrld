@@ -13,28 +13,25 @@ type WorkspaceEventsContext = {
   handleTrackSelection: (trackName: unknown) => unknown;
 };
 
-export function initWorkspaceModulesChangedListener(
-  this: WorkspaceEventsContext
-): void {
+export function initWorkspaceModulesChangedListener(this: WorkspaceEventsContext): void {
   const messaging = getMessaging();
   messaging?.onWorkspaceModulesChanged?.(() => {
     const trackName =
       (this.activeTrack as { name?: unknown } | null)?.name || this.lastRequestedTrackName || null;
     this.workspaceModuleSourceCache.clear();
     this.assetsBaseUrl = null;
-    try {
-      this.trackSandboxHost?.destroy?.();
-    } catch {}
-    this.trackSandboxHost = null;
-    this.trackModuleSources = null;
 
     if (!trackName) return;
     if (this.isLoadingTrack) {
       this.pendingWorkspaceReload = true;
       return;
     }
+    try {
+      this.trackSandboxHost?.destroy?.();
+    } catch {}
+    this.trackSandboxHost = null;
+    this.trackModuleSources = null;
     this.deactivateActiveTrack();
     this.handleTrackSelection(trackName);
   });
 }
-
