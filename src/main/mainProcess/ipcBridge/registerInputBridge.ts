@@ -18,12 +18,16 @@ export function registerInputBridge(): void {
   };
 
   ipcMain.handle("input:configure", async (event, payload) => {
-    if (state.inputManager) {
-      const normalized = normalizeInputConfig(payload);
-      await (state.inputManager as InputManager).initialize(
-        normalized as Parameters<InputManager["initialize"]>[0]
-      );
+    if (!state.inputManager) {
+      return { success: false, reason: "INPUT_MANAGER_MISSING" };
     }
+    const normalized = normalizeInputConfig(payload);
+    if (!normalized) {
+      return { success: false, reason: "INVALID_INPUT_CONFIG" };
+    }
+    await (state.inputManager as InputManager).initialize(
+      normalized as Parameters<InputManager["initialize"]>[0]
+    );
     return { success: true };
   });
 
@@ -63,4 +67,3 @@ export function registerInputBridge(): void {
     return { ok: true };
   });
 }
-

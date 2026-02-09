@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readDebugFlag, readLocalStorageNumber } from "../utils/readDebugFlag";
-import { AUDIO_ANALYSER_CONFIG, AUDIO_BAND_CUTOFF_HZ, AUDIO_DEFAULTS, AUDIO_NORMALIZATION_CONFIG, AUDIO_TRIGGER_CONFIG } from "../audio/audioTuning";
+import {
+  AUDIO_ANALYSER_CONFIG,
+  AUDIO_BAND_CUTOFF_HZ,
+  AUDIO_DEFAULTS,
+  AUDIO_NORMALIZATION_CONFIG,
+  AUDIO_TRIGGER_CONFIG,
+} from "../audio/audioTuning";
 
 type Band = "low" | "medium" | "high";
 
@@ -12,9 +18,27 @@ const DEFAULT_GAINS: Record<Band, number> = { low: 6.0, medium: 14.0, high: 18.0
 export type FileAudioState =
   | { status: "idle"; levels: Levels; peaksDb: PeaksDb; assetRelPath: string | null }
   | { status: "loading"; levels: Levels; peaksDb: PeaksDb; assetRelPath: string | null }
-  | { status: "ready"; levels: Levels; peaksDb: PeaksDb; assetRelPath: string | null; durationSec: number }
-  | { status: "playing"; levels: Levels; peaksDb: PeaksDb; assetRelPath: string | null; durationSec: number }
-  | { status: "error"; levels: Levels; peaksDb: PeaksDb; assetRelPath: string | null; message: string };
+  | {
+      status: "ready";
+      levels: Levels;
+      peaksDb: PeaksDb;
+      assetRelPath: string | null;
+      durationSec: number;
+    }
+  | {
+      status: "playing";
+      levels: Levels;
+      peaksDb: PeaksDb;
+      assetRelPath: string | null;
+      durationSec: number;
+    }
+  | {
+      status: "error";
+      levels: Levels;
+      peaksDb: PeaksDb;
+      assetRelPath: string | null;
+      message: string;
+    };
 
 const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
 
@@ -30,7 +54,8 @@ const dbToLin = (db: number) => (Number.isFinite(db) ? Math.pow(10, db / 20) : 0
 const getBridgeWorkspace = () => {
   const b = (globalThis as unknown as { nwWrldBridge?: unknown }).nwWrldBridge;
   const obj = b && typeof b === "object" ? (b as Record<string, unknown>) : null;
-  const w = obj && typeof obj.workspace === "object" ? (obj.workspace as Record<string, unknown>) : null;
+  const w =
+    obj && typeof obj.workspace === "object" ? (obj.workspace as Record<string, unknown>) : null;
   return w;
 };
 
@@ -48,7 +73,10 @@ export function useDashboardFileAudio({
   minIntervalMs?: number | null;
 }) {
   const zero: Levels = useMemo(() => ({ low: 0, medium: 0, high: 0 }), []);
-  const negInf: PeaksDb = useMemo(() => ({ low: -Infinity, medium: -Infinity, high: -Infinity }), []);
+  const negInf: PeaksDb = useMemo(
+    () => ({ low: -Infinity, medium: -Infinity, high: -Infinity }),
+    []
+  );
 
   const [state, setState] = useState<FileAudioState>({
     status: "idle",
@@ -114,7 +142,13 @@ export function useDashboardFileAudio({
         src.disconnect();
       } catch {}
     }
+    const analyser = analyserRef.current;
     analyserRef.current = null;
+    if (analyser) {
+      try {
+        analyser.disconnect();
+      } catch {}
+    }
     armedRef.current = { low: true, medium: true, high: true };
     peakWhileDisarmedRef.current = { low: 0, medium: 0, high: 0 };
     lastEmitMsRef.current = { low: 0, medium: 0, high: 0 };
@@ -131,7 +165,13 @@ export function useDashboardFileAudio({
       setState({ status: "idle", levels: zero, peaksDb: negInf, assetRelPath: null });
       return;
     }
-    setState({ status: "ready", levels: zero, peaksDb: negInf, assetRelPath: nextAssetRelPath, durationSec: buf.duration });
+    setState({
+      status: "ready",
+      levels: zero,
+      peaksDb: negInf,
+      assetRelPath: nextAssetRelPath,
+      durationSec: buf.duration,
+    });
   }, [negInf, zero]);
 
   const play = useCallback(async () => {
@@ -145,10 +185,18 @@ export function useDashboardFileAudio({
 
     debugRef.current = readDebugFlag("nwWrld.debug.fileAudio");
 
-    const Ctx = (globalThis as unknown as { AudioContext?: unknown; webkitAudioContext?: unknown })
-      .AudioContext || (globalThis as unknown as { webkitAudioContext?: unknown }).webkitAudioContext;
+    const Ctx =
+      (globalThis as unknown as { AudioContext?: unknown; webkitAudioContext?: unknown })
+        .AudioContext ||
+      (globalThis as unknown as { webkitAudioContext?: unknown }).webkitAudioContext;
     if (!Ctx || typeof Ctx !== "function") {
-      setState({ status: "error", message: "AudioContext not available.", levels: zero, peaksDb: negInf, assetRelPath });
+      setState({
+        status: "error",
+        message: "AudioContext not available.",
+        levels: zero,
+        peaksDb: negInf,
+        assetRelPath,
+      });
       return;
     }
 
@@ -171,12 +219,19 @@ export function useDashboardFileAudio({
 
     const bins = new Float32Array(analyser.frequencyBinCount);
     const getThreshold = (band: Band) => {
-      const t = thresholdsRef.current && typeof thresholdsRef.current === "object" ? thresholdsRef.current[band] : undefined;
-      return typeof t === "number" && Number.isFinite(t) ? Math.max(0, Math.min(1, t)) : AUDIO_DEFAULTS.threshold;
+      const t =
+        thresholdsRef.current && typeof thresholdsRef.current === "object"
+          ? thresholdsRef.current[band]
+          : undefined;
+      return typeof t === "number" && Number.isFinite(t)
+        ? Math.max(0, Math.min(1, t))
+        : AUDIO_DEFAULTS.threshold;
     };
     const getMinIntervalMs = () => {
       const v = minIntervalMsRef.current;
-      return typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(10_000, v)) : AUDIO_DEFAULTS.minIntervalMs;
+      return typeof v === "number" && Number.isFinite(v)
+        ? Math.max(0, Math.min(10_000, v))
+        : AUDIO_DEFAULTS.minIntervalMs;
     };
 
     const gains: Record<Band, number> = {
@@ -186,7 +241,11 @@ export function useDashboardFileAudio({
     };
 
     if (debugRef.current) {
-      const debugThresholds = { low: getThreshold("low"), medium: getThreshold("medium"), high: getThreshold("high") };
+      const debugThresholds = {
+        low: getThreshold("low"),
+        medium: getThreshold("medium"),
+        high: getThreshold("high"),
+      };
       const releaseRatio = AUDIO_TRIGGER_CONFIG.releaseRatio;
       const debugReleaseThresholds = {
         low: debugThresholds.low * releaseRatio,
@@ -249,10 +308,17 @@ export function useDashboardFileAudio({
         const nextPeak = Math.max(rawRms, prevPeak * AUDIO_NORMALIZATION_CONFIG.shortPeakDecay);
         bandRmsPeakRef.current[band] = nextPeak;
         const prevLongPeak = bandRmsLongPeakRef.current[band];
-        const nextLongPeak = Math.max(rawRms, prevLongPeak * AUDIO_NORMALIZATION_CONFIG.longPeakDecay);
+        const nextLongPeak = Math.max(
+          rawRms,
+          prevLongPeak * AUDIO_NORMALIZATION_CONFIG.longPeakDecay
+        );
         bandRmsLongPeakRef.current[band] = nextLongPeak;
         const absFloor = dbToLin(AUDIO_NORMALIZATION_CONFIG.absoluteDenomFloorDb);
-        const denom = Math.max(nextPeak, nextLongPeak * AUDIO_NORMALIZATION_CONFIG.longPeakFloorRatio, absFloor);
+        const denom = Math.max(
+          nextPeak,
+          nextLongPeak * AUDIO_NORMALIZATION_CONFIG.longPeakFloorRatio,
+          absFloor
+        );
         const normalized = denom > AUDIO_TRIGGER_CONFIG.minVelocityDenom ? rawRms / denom : 0;
         const gainRatio = DEFAULT_GAINS[band] > 0 ? gains[band] / DEFAULT_GAINS[band] : 1;
         const afterGain = normalized * gainRatio;
@@ -261,11 +327,15 @@ export function useDashboardFileAudio({
         const threshold = getThreshold(band);
         const releaseThreshold = threshold * releaseRatio;
         if (!armedRef.current[band]) {
-          peakWhileDisarmedRef.current[band] = Math.max(peakWhileDisarmedRef.current[band] || 0, vel);
+          peakWhileDisarmedRef.current[band] = Math.max(
+            peakWhileDisarmedRef.current[band] || 0,
+            vel
+          );
           const peakWhileDisarmed = peakWhileDisarmedRef.current[band] || 0;
           if (
             vel < releaseThreshold ||
-            (peakWhileDisarmed > 0 && vel < peakWhileDisarmed * AUDIO_TRIGGER_CONFIG.rearmOnDropRatio)
+            (peakWhileDisarmed > 0 &&
+              vel < peakWhileDisarmed * AUDIO_TRIGGER_CONFIG.rearmOnDropRatio)
           ) {
             armedRef.current[band] = true;
             peakWhileDisarmedRef.current[band] = 0;
@@ -307,8 +377,21 @@ export function useDashboardFileAudio({
           if (prev.status === "error") return prev;
           if (prev.status === "idle") return prev;
           if (prev.status === "loading") return prev;
-          if (prev.status === "ready") return { status: "playing", levels: nextLevels, peaksDb: nextPeaksDb, assetRelPath, durationSec: buf.duration };
-          return { status: "playing", levels: nextLevels, peaksDb: nextPeaksDb, assetRelPath, durationSec: buf.duration };
+          if (prev.status === "ready")
+            return {
+              status: "playing",
+              levels: nextLevels,
+              peaksDb: nextPeaksDb,
+              assetRelPath,
+              durationSec: buf.duration,
+            };
+          return {
+            status: "playing",
+            levels: nextLevels,
+            peaksDb: nextPeaksDb,
+            assetRelPath,
+            durationSec: buf.duration,
+          };
         });
       }
 
@@ -334,7 +417,13 @@ export function useDashboardFileAudio({
       });
     };
 
-    setState({ status: "playing", levels: { ...zero }, peaksDb: { ...negInf }, assetRelPath, durationSec: buf.duration });
+    setState({
+      status: "playing",
+      levels: { ...zero },
+      peaksDb: { ...negInf },
+      assetRelPath,
+      durationSec: buf.duration,
+    });
     try {
       src.start();
     } catch (e) {
@@ -363,30 +452,64 @@ export function useDashboardFileAudio({
 
     const load = async () => {
       await stop();
-      setState({ status: "loading", levels: lastLevelsRef.current, peaksDb: lastPeaksDbRef.current, assetRelPath });
+      setState({
+        status: "loading",
+        levels: lastLevelsRef.current,
+        peaksDb: lastPeaksDbRef.current,
+        assetRelPath,
+      });
       try {
         const w = getBridgeWorkspace();
-        const readFn = w && typeof w.readAssetArrayBuffer === "function" ? (w.readAssetArrayBuffer as (p: unknown) => Promise<unknown>) : null;
+        const readFn =
+          w && typeof w.readAssetArrayBuffer === "function"
+            ? (w.readAssetArrayBuffer as (p: unknown) => Promise<unknown>)
+            : null;
         if (!readFn) {
-          setState({ status: "error", message: "Asset read not available.", levels: zero, peaksDb: negInf, assetRelPath });
+          setState({
+            status: "error",
+            message: "Asset read not available.",
+            levels: zero,
+            peaksDb: negInf,
+            assetRelPath,
+          });
           return;
         }
         const ab = await readFn(assetRelPath);
         if (!(ab instanceof ArrayBuffer)) {
-          setState({ status: "error", message: "Failed to read audio asset.", levels: zero, peaksDb: negInf, assetRelPath });
+          setState({
+            status: "error",
+            message: "Failed to read audio asset.",
+            levels: zero,
+            peaksDb: negInf,
+            assetRelPath,
+          });
           return;
         }
-        const Ctx = (globalThis as unknown as { AudioContext?: unknown; webkitAudioContext?: unknown })
-          .AudioContext || (globalThis as unknown as { webkitAudioContext?: unknown }).webkitAudioContext;
+        const Ctx =
+          (globalThis as unknown as { AudioContext?: unknown; webkitAudioContext?: unknown })
+            .AudioContext ||
+          (globalThis as unknown as { webkitAudioContext?: unknown }).webkitAudioContext;
         if (!Ctx || typeof Ctx !== "function") {
-          setState({ status: "error", message: "AudioContext not available.", levels: zero, peaksDb: negInf, assetRelPath });
+          setState({
+            status: "error",
+            message: "AudioContext not available.",
+            levels: zero,
+            peaksDb: negInf,
+            assetRelPath,
+          });
           return;
         }
         const ctx = audioContextRef.current || new (Ctx as unknown as new () => AudioContext)();
         audioContextRef.current = ctx;
         const audioBuffer = await ctx.decodeAudioData(ab.slice(0));
         bufferRef.current = audioBuffer;
-        setState({ status: "ready", levels: zero, peaksDb: negInf, assetRelPath, durationSec: audioBuffer.duration });
+        setState({
+          status: "ready",
+          levels: zero,
+          peaksDb: negInf,
+          assetRelPath,
+          durationSec: audioBuffer.duration,
+        });
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         setState({ status: "error", message, levels: zero, peaksDb: negInf, assetRelPath });
@@ -403,4 +526,3 @@ export function useDashboardFileAudio({
 
   return { state, play, stop, isPlaying };
 }
-

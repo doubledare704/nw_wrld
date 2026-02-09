@@ -237,6 +237,11 @@ export const EditTrackModal = ({
       setFileUploadError("Upload not available.");
       return;
     }
+    const maxBytes = 50 * 1024 * 1024;
+    if (!Number.isFinite(file.size) || file.size <= 0 || file.size > maxBytes) {
+      setFileUploadError("Upload failed: file is too large (max 50MB).");
+      return;
+    }
     try {
       const bytes = await file.arrayBuffer();
       const res = await write({ filename: file.name, bytes });

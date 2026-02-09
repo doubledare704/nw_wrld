@@ -57,6 +57,7 @@ export function useDashboardAudioCapture({
   const streamRef = useRef<MediaStream | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
+  const visibilityHandlerRef = useRef<(() => void) | null>(null);
   const lastEmitMsRef = useRef<Record<Band, number>>({ low: 0, medium: 0, high: 0 });
   const armedRef = useRef<Record<Band, boolean>>({ low: true, medium: true, high: true });
   const peakWhileDisarmedRef = useRef<Record<Band, number>>({ low: 0, medium: 0, high: 0 });
@@ -95,6 +96,13 @@ export function useDashboardAudioCapture({
   useEffect(() => {
     const stop = async () => {
       runIdRef.current += 1;
+      const onVis = visibilityHandlerRef.current;
+      visibilityHandlerRef.current = null;
+      if (typeof onVis === "function") {
+        try {
+          document.removeEventListener("visibilitychange", onVis);
+        } catch {}
+      }
       if (rafRef.current != null) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
@@ -248,6 +256,7 @@ export function useDashboardAudioCapture({
         }
 
         const tick = async () => {
+          rafRef.current = null;
           if (!enabled) return;
           if (document.hidden) return;
           if (runId !== runIdRef.current) return;
@@ -385,6 +394,22 @@ export function useDashboardAudioCapture({
         rafRef.current = requestAnimationFrame(() => {
           tick().catch(() => {});
         });
+
+        const onVisibilityChange = () => {
+          try {
+            if (!enabled) return;
+            if (document.hidden) return;
+            if (runId !== runIdRef.current) return;
+            if (rafRef.current != null) return;
+            rafRef.current = requestAnimationFrame(() => {
+              tick().catch(() => {});
+            });
+          } catch {}
+        };
+        try {
+          visibilityHandlerRef.current = onVisibilityChange;
+          document.addEventListener("visibilitychange", onVisibilityChange);
+        } catch {}
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         if (debugRef.current) console.log("[AudioDebug] error", { message });
